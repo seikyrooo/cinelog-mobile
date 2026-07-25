@@ -1,0 +1,17 @@
+# Flutter & Dart build outputs
+.dart_tool/
+.pub/
+.pub-cache/
+build/
+
+# Android & iOS build artifacts
+.gradle/
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
+
+# Environment & IDE
+.env
+.idea/
+.vscode/
+*.swp
