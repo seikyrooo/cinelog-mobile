@@ -93,7 +93,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> {
                       ? const Center(
                           child: Text(
                             'Belum ada film/series tersimpan.\nSilakan login atau cari film untuk disimpan.',
-                            textAlign: TextAlign.Center,
+                            textAlign: TextAlign.center,
                             style: TextStyle(color: Colors.white54),
                           ),
                         )
