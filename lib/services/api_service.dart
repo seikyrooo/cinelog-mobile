@@ -4,8 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/media_item.dart';
 
 class ApiService {
-  // Ganti IP ini sesuai lokasi VPS atau emulator Android (10.0.2.2 untuk Android Emulator ke localhost)
-  static String baseUrl = 'http://10.0.2.2:3000';
+  // Production VPS Server:
+  static String baseUrl = 'https://cinelog.dwikooo.cloud';
+
+  // Untuk Debugging Android Emulator (Localhost PC):
+  // static String baseUrl = 'http://10.0.2.2:3000';
 
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
