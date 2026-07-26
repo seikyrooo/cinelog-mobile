@@ -40,7 +40,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = const [
     SearchScreen(),
-    WatchlistScreen(),
+    WatchlistScreen(initialMediaType: 'tv'),
+    WatchlistScreen(initialMediaType: 'movie'),
     AuthScreen(),
   ];
 
@@ -57,14 +58,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         backgroundColor: const Color(0xFF0F172A),
         selectedItemColor: Colors.amber,
         unselectedItemColor: Colors.white38,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.search),
-            label: 'Cari',
+            label: 'Eksplor',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.star),
-            label: 'Watchlist',
+            icon: Icon(Icons.tv),
+            label: 'TV Shows',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.movie),
+            label: 'Movies',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),

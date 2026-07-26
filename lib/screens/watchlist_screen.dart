@@ -4,50 +4,48 @@ import '../services/api_service.dart';
 import 'media_detail_screen.dart';
 
 class WatchlistScreen extends StatefulWidget {
-  const WatchlistScreen({super.key});
+  final String initialMediaType; // 'tv' or 'movie'
+  const WatchlistScreen({super.key, this.initialMediaType = 'tv'});
 
   @override
   State<WatchlistScreen> createState() => _WatchlistScreenState();
 }
 
-class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderStateMixin {
-  late TabController _mainTabController;
+class _WatchlistScreenState extends State<WatchlistScreen>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tvSubTabController;
 
   bool _isLoading = true;
   List<WatchlistItem> _items = [];
-  String _activeStatus = 'all';
-  bool _favoriteOnly = false;
+  final String _activeStatus = 'all';
+  final bool _favoriteOnly = false;
+  late String _currentMediaType;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _mainTabController = TabController(length: 2, vsync: this);
+    _currentMediaType = widget.initialMediaType;
     _tvSubTabController = TabController(length: 2, vsync: this);
-
-    _mainTabController.addListener(() {
-      if (!_mainTabController.indexIsChanging) {
-        _fetchWatchlist();
-      }
-    });
-
     _fetchWatchlist();
   }
 
   @override
   void dispose() {
-    _mainTabController.dispose();
     _tvSubTabController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchWatchlist() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    final mediaType = _mainTabController.index == 0 ? 'tv' : 'movie';
+
     final items = await ApiService.getWatchlist(
       status: _activeStatus == 'all' ? null : _activeStatus,
       favoriteOnly: _favoriteOnly,
-      mediaType: mediaType,
+      mediaType: _currentMediaType,
     );
 
     if (mounted) {
@@ -83,26 +81,26 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
   void _openEditModal(WatchlistItem item) {
     final statusController = TextEditingController(text: item.status);
     final notesController = TextEditingController(text: item.notes);
-    double ratingVal = item.rating > 0 ? item.rating : 4.0;
+    double ratingVal = item.rating > 0 ? item.rating : 8.0;
     bool isFavorite = item.favorite;
-    int seasonWatched = item.seasonWatched;
+    int seasonWatched = item.seasonWatched > 0 ? item.seasonWatched : 1;
     int episodesWatched = item.episodesWatched;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: const Color(0xFF0F172A),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Padding(
               padding: EdgeInsets.only(
-                top: 20,
                 left: 20,
                 right: 20,
+                top: 20,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
               child: Column(
@@ -113,74 +111,61 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Edit ${item.movie.title}',
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        'Edit Watchlist',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white54),
+                        icon: const Icon(Icons.close, color: Colors.white70),
                         onPressed: () => Navigator.pop(context),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  // Rating Stars 1-5
-                  const Text('Rating Kamu (1-5 Bintang):', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: List.generate(5, (index) {
-                      final starNum = index + 1;
-                      return IconButton(
-                        icon: Icon(
-                          starNum <= ratingVal ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 28,
-                        ),
-                        onPressed: () {
-                          setModalState(() => ratingVal = starNum.toDouble());
-                        },
-                      );
-                    }),
+                  Text(
+                    item.movie.title,
+                    style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
 
-                  // Status Dropdown
                   DropdownButtonFormField<String>(
-                    value: statusController.text,
-                    dropdownColor: const Color(0xFF0F172A),
-                    style: const TextStyle(color: Colors.white),
+                    initialValue: statusController.text,
                     decoration: const InputDecoration(
                       labelText: 'Status Tontonan',
-                      labelStyle: TextStyle(color: Colors.white70),
                       border: OutlineInputBorder(),
                     ),
                     items: const [
                       DropdownMenuItem(value: 'watching', child: Text('Sedang Nonton (Watching)')),
                       DropdownMenuItem(value: 'completed', child: Text('Selesai (Completed)')),
-                      DropdownMenuItem(value: 'plan_to_watch', child: Text('Rencana Nonton (Plan to Watch)')),
+                      DropdownMenuItem(value: 'plan_to_watch', child: Text('Rencana Nonton')),
                       DropdownMenuItem(value: 'on_hold', child: Text('Ditunda (On Hold)')),
                       DropdownMenuItem(value: 'dropped', child: Text('Dihentikan (Dropped)')),
                     ],
                     onChanged: (val) {
-                      if (val != null) setModalState(() => statusController.text = val);
+                      if (val != null) statusController.text = val;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
-                  if (item.movie.mediaType == 'tv') ...[
+                  Text('Rating (1 - 10): ${ratingVal.toStringAsFixed(1)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Slider(
+                    value: ratingVal,
+                    min: 1.0,
+                    max: 10.0,
+                    divisions: 18,
+                    activeColor: Colors.amber,
+                    label: ratingVal.toStringAsFixed(1),
+                    onChanged: (val) => setModalState(() => ratingVal = val),
+                  ),
+                  const SizedBox(height: 10),
+
+                  if (_currentMediaType == 'tv') ...[
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
                             initialValue: seasonWatched.toString(),
                             keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: 'Season',
-                              labelStyle: TextStyle(color: Colors.white70),
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (val) => seasonWatched = int.tryParse(val) ?? 1,
+                            decoration: const InputDecoration(labelText: 'Season Watched', border: OutlineInputBorder()),
+                            onChanged: (v) => seasonWatched = int.tryParse(v) ?? 1,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -188,35 +173,29 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
                           child: TextFormField(
                             initialValue: episodesWatched.toString(),
                             keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: 'Eps Nonton',
-                              labelStyle: TextStyle(color: Colors.white70),
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (val) => episodesWatched = int.tryParse(val) ?? 0,
+                            decoration: const InputDecoration(labelText: 'Episodes Watched', border: OutlineInputBorder()),
+                            onChanged: (v) => episodesWatched = int.tryParse(v) ?? 0,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                   ],
 
                   CheckboxListTile(
-                    title: const Text('Tandai sebagai Favorit', style: TextStyle(color: Colors.white)),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Tandai sebagai Favorit'),
                     value: isFavorite,
                     activeColor: Colors.amber,
-                    checkColor: Colors.black,
                     onChanged: (val) => setModalState(() => isFavorite = val ?? false),
                   ),
+                  const SizedBox(height: 10),
 
                   TextField(
                     controller: notesController,
                     maxLines: 2,
-                    style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
-                      labelText: 'Catatan / Review Singkat',
-                      labelStyle: TextStyle(color: Colors.white70),
+                      labelText: 'Catatan / Review',
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -257,76 +236,71 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
     );
   }
 
-  Future<void> _deleteItem(int id) async {
-    final confirmed = await showDialog<bool>(
+  void _deleteItem(int id) async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Hapus Tontonan?', style: TextStyle(color: Colors.white)),
-        content: const Text('Apakah kamu yakin ingin menghapus item ini dari watchlist?', style: TextStyle(color: Colors.white70)),
+        title: const Text('Hapus Item'),
+        content: const Text('Apakah kamu yakin ingin menghapus tontonan ini dari Watchlist?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal', style: TextStyle(color: Colors.white54))),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Hapus', style: TextStyle(color: Colors.redAccent))),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.redAccent)),
+          ),
         ],
       ),
     );
 
-    if (confirmed == true) {
-      await ApiService.deleteWatchlist(id);
-      _fetchWatchlist();
+    if (confirm == true) {
+      final success = await ApiService.deleteWatchlist(id);
+      if (success && mounted) {
+        _fetchWatchlist();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Item berhasil dihapus')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: const Text('Watchlist Saya', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1E293B),
-        elevation: 0,
-        bottom: TabBar(
-          controller: _mainTabController,
-          indicatorColor: Colors.amber,
-          labelColor: Colors.amber,
-          unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(icon: Icon(Icons.tv), text: 'TV Shows'),
-            Tab(icon: Icon(Icons.movie), text: 'Movies'),
-          ],
+        title: Text(
+          _currentMediaType == 'tv' ? 'TV Shows Watchlist' : 'Movies Watchlist',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-      ),
-      body: TabBarView(
-        controller: _mainTabController,
-        children: [
-          _buildTvShowsTab(),
-          _buildMoviesTab(),
+        backgroundColor: const Color(0xFF0F172A),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.amber),
+            onPressed: _fetchWatchlist,
+          ),
         ],
       ),
+      body: _currentMediaType == 'tv' ? _buildTvExperience() : _buildMoviesExperience(),
     );
   }
 
-  // TV Shows View matching TV Time app
-  Widget _buildTvShowsTab() {
+  Widget _buildTvExperience() {
     return Column(
       children: [
-        // Sub-tabs: WATCH LIST vs UPCOMING
         Container(
-          color: const Color(0xFF1E293B),
+          color: const Color(0xFF0F172A),
           child: TabBar(
             controller: _tvSubTabController,
             indicatorColor: Colors.white,
-            indicatorWeight: 3,
             labelColor: Colors.white,
-            unselectedLabelColor: Colors.white54,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+            unselectedLabelColor: Colors.white38,
+            labelStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
             tabs: const [
               Tab(text: 'WATCH LIST'),
               Tab(text: 'UPCOMING'),
             ],
           ),
         ),
-
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: Colors.amber))
@@ -369,24 +343,20 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
       color: Colors.amber,
       child: ListView(
         padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          // Section 1: WATCH NEXT
           if (watchNextItems.isNotEmpty) ...[
             _sectionPillBadge('WATCH NEXT', Colors.white, Colors.black),
             const SizedBox(height: 10),
             ...watchNextItems.map((item) => _buildTvTimeCard(item, isCompleted: false)),
             const SizedBox(height: 20),
           ],
-
-          // Section 2: HAVENT WATCHED FOR A WHILE
           if (idleItems.isNotEmpty) ...[
             _sectionPillBadge('HAVENT WATCHED FOR A WHILE', const Color(0xFF475569), Colors.white),
             const SizedBox(height: 10),
             ...idleItems.map((item) => _buildTvTimeCard(item, isCompleted: false)),
             const SizedBox(height: 20),
           ],
-
-          // Section 3: WATCHED HISTORY
           if (historyItems.isNotEmpty) ...[
             _sectionPillBadge('WATCHED HISTORY', const Color(0xFF334155), Colors.white70),
             const SizedBox(height: 10),
@@ -422,10 +392,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
           child: Row(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: imageUrl.isNotEmpty
-                    ? Image.network(imageUrl, width: 75, height: 110, fit: BoxFit.cover)
-                    : Container(width: 75, height: 110, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24)),
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 70,
+                  height: 100,
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(imageUrl, fit: BoxFit.cover)
+                      : Container(color: Colors.grey[900]),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -434,18 +408,24 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
                   children: [
                     Text(
                       item.movie.title.toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      '📅 Rilis: ${item.movie.nextAirDate}',
-                      style: const TextStyle(color: Colors.lightBlueAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: Colors.lightBlueAccent),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Rilis: ${item.movie.nextAirDate}',
+                          style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
                     if (item.movie.nextEpisodeName.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '"${item.movie.nextEpisodeName}"',
-                        style: const TextStyle(color: Colors.white70, fontSize: 12, fontStyle: FontStyle.italic),
+                        'Judul Eps: "${item.movie.nextEpisodeName}"',
+                        style: const TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
                   ],
@@ -458,13 +438,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
     );
   }
 
-  Widget _sectionPillBadge(String title, Color bg, Color textCol) {
+  Widget _sectionPillBadge(String title, Color bgCol, Color textCol) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: bg,
+          color: bgCol,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -479,7 +459,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
     final imageUrl = ApiService.getFullImageUrl(item.movie);
     final totalEps = item.movie.totalEpisodes > 0 ? item.movie.totalEpisodes : item.totalEpisodes;
     final nextEpsNum = (item.episodesWatched) + 1;
-    final remainingCount = (isCompleted || (totalEps > 0 && item.episodesWatched >= totalEps)) ? 0 : (totalEps > 0 ? (totalEps - item.episodesWatched) : 0);
+    final remainingCount = (isCompleted || (totalEps > 0 && item.episodesWatched >= totalEps))
+        ? 0
+        : (totalEps > 0 ? (totalEps - item.episodesWatched) : 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -490,134 +472,147 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Poster
           GestureDetector(
             onTap: () => _openDetailScreen(item.movie),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: imageUrl.isNotEmpty
-                  ? Image.network(imageUrl, width: 85, height: 120, fit: BoxFit.cover)
-                  : Container(width: 85, height: 120, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24)),
+              child: SizedBox(
+                width: 75,
+                height: 105,
+                child: imageUrl.isNotEmpty
+                    ? Image.network(imageUrl, fit: BoxFit.cover)
+                    : Container(color: Colors.grey[900]),
+              ),
             ),
           ),
           const SizedBox(width: 14),
-
-          // Details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title Tag >
                 GestureDetector(
                   onTap: () => _openDetailScreen(item.movie),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.white.withOpacity(0.15)),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            item.movie.title.toUpperCase(),
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.chevron_right, color: Colors.white, size: 14),
-                      ],
+                    child: Text(
+                      '${item.movie.title.toUpperCase()} >',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
                 const SizedBox(height: 6),
 
-                // Season & Episode Headline (e.g. S03 | E01 +51 eps lagi)
-                Row(
-                  children: [
-                    Text(
-                      isCompleted
-                          ? 'S${_padZero(item.seasonWatched)} | E${_padZero(item.episodesWatched)}'
-                          : 'S${_padZero(item.seasonWatched)} | E${_padZero(nextEpsNum)}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    if (!isCompleted && remainingCount > 0) ...[
-                      const SizedBox(width: 6),
+                if (isCompleted) ...[
+                  Row(
+                    children: [
+                      Text(
+                        'S${_padZero(item.seasonWatched > 0 ? item.seasonWatched : 1)} | E${_padZero(item.episodesWatched > 0 ? item.episodesWatched : totalEps)}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.lightBlueAccent.withOpacity(0.15),
+                          color: Colors.green,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '+$remainingCount eps lagi',
-                          style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                          'TAMAT (${item.episodesWatched > 0 ? item.episodesWatched : totalEps} eps)',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-
-                // Episode Title
-                Text(
-                  isCompleted
-                      ? 'Semua episode telah ditonton 100%'
-                      : (item.movie.nextEpisodeName.isNotEmpty
-                          ? 'Next: "${item.movie.nextEpisodeName}"'
-                          : 'Episode $nextEpsNum'),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-
-                if (!isCompleted && nextEpsNum == 1)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
-                    child: const Text('PREMIERE', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
                   ),
+                  const SizedBox(height: 4),
+                  const Text('Semua episode telah ditonton 100%', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                ] else ...[
+                  Row(
+                    children: [
+                      Text(
+                        'S${_padZero(item.seasonWatched > 0 ? item.seasonWatched : 1)} | E${_padZero(nextEpsNum)}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      if (remainingCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.lightBlueAccent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+$remainingCount eps lagi',
+                            style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.movie.nextEpisodeName.isNotEmpty
+                        ? 'Next: "${item.movie.nextEpisodeName}"'
+                        : 'Next: Episode $nextEpsNum',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  const SizedBox(height: 6),
+
+                  Row(
+                    children: [
+                      if (nextEpsNum == 1)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+                          child: const Text('PREMIERE', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                      if (item.favorite)
+                        Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(4)),
+                          child: const Text('★ FAVORIT', style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold)),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
 
-          // Big Circular Checkmark Button (TV Time style)
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () => _incrementEpisode(item),
-            child: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isCompleted ? Colors.green : Colors.white,
+          if (!isCompleted)
+            IconButton(
+              icon: Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.check, color: Colors.black, size: 22),
               ),
-              child: Icon(
-                Icons.check,
-                color: isCompleted ? Colors.white : Colors.black,
-                size: 26,
-              ),
+              onPressed: () => _incrementEpisode(item),
+            )
+          else
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+              child: const Icon(Icons.check, color: Colors.white, size: 22),
             ),
-          ),
         ],
       ),
     );
   }
 
-  String _padZero(int n) => n < 10 ? '0$n' : '$n';
-
-  // Movies Grid View
-  Widget _buildMoviesTab() {
+  Widget _buildMoviesExperience() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: Colors.amber));
     }
+
     if (_items.isEmpty) {
       return const Center(child: Text('Belum ada film di watchlist.', style: TextStyle(color: Colors.white54)));
     }
@@ -629,108 +624,118 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
         padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.65,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          childAspectRatio: 0.62,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
         ),
         itemCount: _items.length,
         itemBuilder: (context, index) {
           final item = _items[index];
           final imageUrl = ApiService.getFullImageUrl(item.movie);
 
-          return GestureDetector(
-            onTap: () => _openDetailScreen(item.movie),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.08)),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        imageUrl.isNotEmpty
-                            ? Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover)
-                            : const Center(child: Icon(Icons.movie, size: 48, color: Colors.white24)),
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _openDetailScreen(item.movie),
+                        child: Positioned.fill(
+                          child: imageUrl.isNotEmpty
+                              ? Image.network(imageUrl, fit: BoxFit.cover)
+                              : Container(color: Colors.grey[900]),
+                        ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            item.status.toUpperCase(),
+                            style: const TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      if (item.favorite)
                         Positioned(
                           top: 8,
-                          left: 8,
+                          right: 8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: item.status == 'completed' ? Colors.green : Colors.blue,
-                              borderRadius: BorderRadius.circular(4),
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Text(
-                              item.status.toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                            ),
+                            child: const Text('★ FAV', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                           ),
                         ),
-                        if (item.favorite)
-                          const Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Icon(Icons.star, color: Colors.amber, size: 20),
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.movie.title,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.movie.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (item.rating > 0)
                             Text(
-                              item.movie.releaseDate.length >= 4 ? item.movie.releaseDate.substring(0, 4) : '',
-                              style: const TextStyle(color: Colors.white54, fontSize: 11),
+                              '★ ${item.rating.toStringAsFixed(1)}',
+                              style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
                             ),
-                            if (item.rating > 0)
-                              Text('★ ${item.rating}', style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.edit, color: Colors.white54, size: 16),
-                              onPressed: () => _openEditModal(item),
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              icon: const Icon(Icons.delete, color: Colors.redAccent, size: 16),
-                              onPressed: () => _deleteItem(item.id),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                          Row(
+                            children: [
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(Icons.edit, size: 16, color: Colors.white70),
+                                onPressed: () => _openEditModal(item),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(Icons.delete, size: 16, color: Colors.redAccent),
+                                onPressed: () => _deleteItem(item.id),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         },
       ),
     );
+  }
+
+  String _padZero(int num) {
+    return num < 10 ? '0$num' : '$num';
   }
 }
