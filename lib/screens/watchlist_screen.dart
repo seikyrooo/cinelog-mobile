@@ -343,9 +343,22 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
   }
 
   Widget _buildTvWatchlistTab() {
-    final watchNextItems = _items.where((i) => i.status == 'watching' || i.status == 'plan_to_watch').toList();
-    final idleItems = _items.where((i) => i.status == 'on_hold').toList();
-    final historyItems = _items.where((i) => i.status == 'completed').toList();
+    final watchNextItems = _items.where((i) {
+      final total = i.movie.totalEpisodes > 0 ? i.movie.totalEpisodes : i.totalEpisodes;
+      final isTamat = i.status == 'completed' || (total > 0 && i.episodesWatched >= total);
+      return !isTamat && (i.status == 'watching' || i.status == 'plan_to_watch');
+    }).toList();
+
+    final idleItems = _items.where((i) {
+      final total = i.movie.totalEpisodes > 0 ? i.movie.totalEpisodes : i.totalEpisodes;
+      final isTamat = i.status == 'completed' || (total > 0 && i.episodesWatched >= total);
+      return !isTamat && i.status == 'on_hold';
+    }).toList();
+
+    final historyItems = _items.where((i) {
+      final total = i.movie.totalEpisodes > 0 ? i.movie.totalEpisodes : i.totalEpisodes;
+      return i.status == 'completed' || (total > 0 && i.episodesWatched >= total);
+    }).toList();
 
     if (_items.isEmpty) {
       return const Center(child: Text('Belum ada TV Show di watchlist.', style: TextStyle(color: Colors.white54)));
@@ -466,7 +479,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
     final imageUrl = ApiService.getFullImageUrl(item.movie);
     final totalEps = item.movie.totalEpisodes > 0 ? item.movie.totalEpisodes : item.totalEpisodes;
     final nextEpsNum = (item.episodesWatched) + 1;
-    final remainingCount = totalEps > 0 ? (totalEps - item.episodesWatched - 1) : 0;
+    final remainingCount = (isCompleted || (totalEps > 0 && item.episodesWatched >= totalEps)) ? 0 : (totalEps > 0 ? (totalEps - item.episodesWatched) : 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
