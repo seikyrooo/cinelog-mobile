@@ -7,9 +7,6 @@ class ApiService {
   // Production VPS Server:
   static String baseUrl = 'https://cinelog.dwikooo.cloud';
 
-  // Untuk Debugging Android Emulator (Localhost PC):
-  // static String baseUrl = 'http://10.0.2.2:3000';
-
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('jwt_token');
@@ -68,19 +65,39 @@ class ApiService {
     return [];
   }
 
-  static Future<List<WatchlistItem>> getWatchlist({String? status, bool favoriteOnly = false}) async {
+  static Future<Map<String, dynamic>?> fetchMediaDetail(int id, String mediaType) async {
+    final url = Uri.parse('$baseUrl/api/detail?id=$id&type=$mediaType');
+    try {
+      final resp = await http.get(url);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        return data['data'];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<List<WatchlistItem>> getWatchlist({
+    String? status,
+    bool favoriteOnly = false,
+    String? mediaType,
+  }) async {
     final token = await getToken();
     if (token == null) return [];
 
-    String queryParams = '';
+    List<String> queryParts = [];
     if (status != null && status.isNotEmpty && status != 'all') {
-      queryParams += 'status=$status&';
+      queryParts.add('status=$status');
     }
     if (favoriteOnly) {
-      queryParams += 'favorite=true';
+      queryParts.add('favorite=true');
+    }
+    if (mediaType != null && mediaType.isNotEmpty && mediaType != 'all') {
+      queryParts.add('media_type=$mediaType');
     }
 
-    final url = Uri.parse('$baseUrl/api/user/watchlist?$queryParams');
+    final queryStr = queryParts.isNotEmpty ? '?${queryParts.join('&')}' : '';
+    final url = Uri.parse('$baseUrl/api/user/watchlist$queryStr');
     final resp = await http.get(
       url,
       headers: {'Authorization': 'Bearer $token'},
@@ -100,6 +117,13 @@ class ApiService {
     required double rating,
     required bool favorite,
     required String notes,
+    int seasonWatched = 1,
+    int episodesWatched = 0,
+    int totalEpisodes = 0,
+    String director = '',
+    String cast = '',
+    String nextAirDate = '',
+    String nextEpisodeName = '',
   }) async {
     final token = await getToken();
     if (token == null) return false;
@@ -120,10 +144,18 @@ class ApiService {
         'backdrop_path': item.backdropPath,
         'release_date': item.releaseDate,
         'vote_average': item.voteAverage,
+        'director': director.isNotEmpty ? director : item.director,
+        'cast': cast.isNotEmpty ? cast : item.cast,
+        'total_seasons': item.totalSeasons,
+        'next_air_date': nextAirDate.isNotEmpty ? nextAirDate : item.nextAirDate,
+        'next_episode_name': nextEpisodeName.isNotEmpty ? nextEpisodeName : item.nextEpisodeName,
         'status': status,
         'rating': rating,
         'favorite': favorite,
         'notes': notes,
+        'season_watched': seasonWatched,
+        'episodes_watched': episodesWatched,
+        'total_episodes': totalEpisodes > 0 ? totalEpisodes : item.totalEpisodes,
       }),
     );
 
@@ -136,6 +168,9 @@ class ApiService {
     required double rating,
     required bool favorite,
     required String notes,
+    int seasonWatched = 1,
+    int episodesWatched = 0,
+    int totalEpisodes = 0,
   }) async {
     final token = await getToken();
     if (token == null) return false;
@@ -152,7 +187,23 @@ class ApiService {
         'rating': rating,
         'favorite': favorite,
         'notes': notes,
+        'season_watched': seasonWatched,
+        'episodes_watched': episodesWatched,
+        'total_episodes': totalEpisodes,
       }),
+    );
+
+    return resp.statusCode == 200;
+  }
+
+  static Future<bool> incrementEpisodeProgress(int id) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    final url = Uri.parse('$baseUrl/api/user/watchlist/$id/progress');
+    final resp = await http.put(
+      url,
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     return resp.statusCode == 200;
@@ -169,5 +220,18 @@ class ApiService {
     );
 
     return resp.statusCode == 200;
+  }
+
+  static String getFullImageUrl(MediaItem movie) {
+    if (movie.localPosterPath.isNotEmpty) {
+      if (movie.localPosterPath.startsWith('/')) {
+        return '$baseUrl${movie.localPosterPath}';
+      }
+      return '$baseUrl/${movie.localPosterPath}';
+    }
+    if (movie.posterPath.isNotEmpty) {
+      return 'https://image.tmdb.org/t/p/w500${movie.posterPath}';
+    }
+    return '';
   }
 }

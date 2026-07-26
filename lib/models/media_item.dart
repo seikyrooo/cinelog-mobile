@@ -10,6 +10,13 @@ class MediaItem {
   final double voteAverage;
   final String localPosterPath;
   final String localBackdropPath;
+  final String director;
+  final String cast;
+  final int totalSeasons;
+  final int totalEpisodes;
+  final String nextAirDate;
+  final String nextEpisodeName;
+  final String mediaStatus;
 
   MediaItem({
     required this.id,
@@ -23,6 +30,13 @@ class MediaItem {
     required this.voteAverage,
     this.localPosterPath = '',
     this.localBackdropPath = '',
+    this.director = '',
+    this.cast = '',
+    this.totalSeasons = 0,
+    this.totalEpisodes = 0,
+    this.nextAirDate = '',
+    this.nextEpisodeName = '',
+    this.mediaStatus = '',
   });
 
   factory MediaItem.fromSearchJson(Map<String, dynamic> json) {
@@ -36,6 +50,13 @@ class MediaItem {
       backdropPath: json['backdrop_path'] ?? '',
       releaseDate: json['release_date'] ?? json['first_air_date'] ?? '',
       voteAverage: (json['vote_average'] ?? 0.0).toDouble(),
+      director: json['director'] ?? '',
+      cast: json['cast'] ?? '',
+      totalSeasons: json['total_seasons'] ?? 0,
+      totalEpisodes: json['total_episodes'] ?? 0,
+      nextAirDate: json['next_air_date'] ?? '',
+      nextEpisodeName: json['next_episode_name'] ?? '',
+      mediaStatus: json['media_status'] ?? '',
     );
   }
 
@@ -52,6 +73,13 @@ class MediaItem {
       voteAverage: (json['vote_average'] ?? 0.0).toDouble(),
       localPosterPath: json['local_poster_path'] ?? '',
       localBackdropPath: json['local_backdrop_path'] ?? '',
+      director: json['director'] ?? '',
+      cast: json['cast'] ?? '',
+      totalSeasons: json['total_seasons'] ?? 0,
+      totalEpisodes: json['total_episodes'] ?? 0,
+      nextAirDate: json['next_air_date'] ?? '',
+      nextEpisodeName: json['next_episode_name'] ?? '',
+      mediaStatus: json['media_status'] ?? '',
     );
   }
 }
@@ -64,6 +92,9 @@ class WatchlistItem {
   final double rating;
   final bool favorite;
   final String notes;
+  final int seasonWatched;
+  final int episodesWatched;
+  final int totalEpisodes;
   final MediaItem movie;
 
   WatchlistItem({
@@ -74,6 +105,9 @@ class WatchlistItem {
     required this.rating,
     required this.favorite,
     required this.notes,
+    required this.seasonWatched,
+    required this.episodesWatched,
+    required this.totalEpisodes,
     required this.movie,
   });
 
@@ -86,6 +120,9 @@ class WatchlistItem {
       rating: (json['rating'] ?? 0.0).toDouble(),
       favorite: json['favorite'] ?? false,
       notes: json['notes'] ?? '',
+      seasonWatched: json['season_watched'] ?? 1,
+      episodesWatched: json['episodes_watched'] ?? 0,
+      totalEpisodes: json['total_episodes'] ?? 0,
       movie: MediaItem.fromDbJson(json['movie'] ?? {}),
     );
   }
