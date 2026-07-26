@@ -44,9 +44,9 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
   Future<void> _fetchWatchlist() async {
     setState(() => _isLoading = true);
     final mediaType = _mainTabController.index == 0 ? 'tv' : 'movie';
-    final items = await ApiService.fetchWatchlist(
+    final items = await ApiService.getWatchlist(
       status: _activeStatus == 'all' ? null : _activeStatus,
-      favorite: _favoriteOnly ? true : null,
+      favoriteOnly: _favoriteOnly,
       mediaType: mediaType,
     );
 
@@ -59,12 +59,12 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
   }
 
   Future<void> _incrementEpisode(WatchlistItem item) async {
-    final updatedItem = await ApiService.incrementEpisodeProgress(item.id);
-    if (updatedItem != null && mounted) {
+    final success = await ApiService.incrementEpisodeProgress(item.id);
+    if (success && mounted) {
       _fetchWatchlist();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Progres ${item.movie.title} diperbarui! (Eps ${updatedItem.episodesWatched})'),
+          content: Text('Progres ${item.movie.title} diperbarui!'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -231,8 +231,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       onPressed: () async {
-                        await ApiService.updateWatchlistItem(
-                          item.id,
+                        await ApiService.updateWatchlist(
+                          id: item.id,
                           status: statusController.text,
                           rating: ratingVal,
                           favorite: isFavorite,
