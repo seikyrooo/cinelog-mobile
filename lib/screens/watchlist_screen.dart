@@ -234,7 +234,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Text(
@@ -274,7 +274,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.between,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
                                   'Season ${item.seasonWatched} • Eps ${item.episodesWatched}${totalEps > 0 ? ' / $totalEps' : ''}',
