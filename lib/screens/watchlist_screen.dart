@@ -525,7 +525,7 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
                 ),
                 const SizedBox(height: 6),
 
-                // Season & Episode Headline (e.g. S03 | E01 +51)
+                // Season & Episode Headline (e.g. S03 | E01 +51 eps lagi)
                 Row(
                   children: [
                     Text(
@@ -536,16 +536,30 @@ class _WatchlistScreenState extends State<WatchlistScreen> with TickerProviderSt
                     ),
                     if (!isCompleted && remainingCount > 0) ...[
                       const SizedBox(width: 6),
-                      Text('+$remainingCount', style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.lightBlueAccent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '+$remainingCount eps lagi',
+                          style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ],
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
 
                 // Episode Title
                 Text(
-                  isCompleted ? 'Semua episode telah ditonton' : (item.movie.nextEpisodeName.isNotEmpty ? item.movie.nextEpisodeName : 'Episode $nextEpsNum'),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  isCompleted
+                      ? 'Semua episode telah ditonton 100%'
+                      : (item.movie.nextEpisodeName.isNotEmpty
+                          ? 'Next: "${item.movie.nextEpisodeName}"'
+                          : 'Episode $nextEpsNum'),
+                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
