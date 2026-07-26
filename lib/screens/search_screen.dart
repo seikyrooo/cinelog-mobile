@@ -176,7 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
-                                                '★ ${(item.voteAverage / 2).toStringAsFixed(1)}',
+                                                '★ ${item.voteAverage.toStringAsFixed(1)}',
                                                 style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
                                               ),
                                             ),

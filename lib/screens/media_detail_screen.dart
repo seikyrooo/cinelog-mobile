@@ -150,7 +150,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                 const Icon(Icons.star, color: Colors.amber, size: 18),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '${(widget.item.voteAverage / 2).toStringAsFixed(1)} / 5.0',
+                                  '${widget.item.voteAverage.toStringAsFixed(1)} / 10.0',
                                   style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
                               ],
