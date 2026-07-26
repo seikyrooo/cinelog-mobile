@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/media_item.dart';
 import '../services/api_service.dart';
+import 'media_detail_screen.dart';
 
 class WatchlistScreen extends StatefulWidget {
   const WatchlistScreen({super.key});
@@ -15,6 +16,13 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
   List<WatchlistItem> _items = [];
   String _activeStatus = 'all';
   bool _favoriteOnly = false;
+
+  void _openDetailScreen(MediaItem item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => MediaDetailScreen(item: item)),
+    );
+  }
 
   @override
   void initState() {
@@ -219,12 +227,15 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Poster
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: imageUrl.isNotEmpty
-                      ? Image.network(imageUrl, width: 75, height: 110, fit: BoxFit.cover)
-                      : Container(width: 75, height: 110, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24)),
+                // Poster (Tap to open detail)
+                GestureDetector(
+                  onTap: () => _openDetailScreen(item.movie),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(imageUrl, width: 75, height: 110, fit: BoxFit.cover)
+                        : Container(width: 75, height: 110, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24)),
+                  ),
                 ),
                 const SizedBox(width: 12),
 
@@ -237,11 +248,14 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text(
-                              item.movie.title,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: GestureDetector(
+                              onTap: () => _openDetailScreen(item.movie),
+                              child: Text(
+                                item.movie.title,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                           Container(
@@ -366,16 +380,18 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
         final item = _items[index];
         final imageUrl = ApiService.getFullImageUrl(item.movie);
 
-        return Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        return GestureDetector(
+          onTap: () => _openDetailScreen(item.movie),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Expanded(
                 child: Stack(
                   children: [
@@ -455,7 +471,8 @@ class _WatchlistScreenState extends State<WatchlistScreen> with SingleTickerProv
               ),
             ],
           ),
-        );
+        ),
+      );
       },
     );
   }

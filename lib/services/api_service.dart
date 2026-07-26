@@ -77,6 +77,18 @@ class ApiService {
     return null;
   }
 
+  static Future<List<dynamic>> fetchTVSeasonEpisodes(int tmdbId, int seasonNumber) async {
+    final url = Uri.parse('$baseUrl/api/tv/season?id=$tmdbId&season=$seasonNumber');
+    try {
+      final resp = await http.get(url);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        return data['data'] ?? [];
+      }
+    } catch (_) {}
+    return [];
+  }
+
   static Future<List<WatchlistItem>> getWatchlist({
     String? status,
     bool favoriteOnly = false,

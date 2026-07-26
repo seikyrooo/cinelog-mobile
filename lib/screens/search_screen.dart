@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/media_item.dart';
 import '../services/api_service.dart';
+import 'media_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -33,8 +34,14 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  void _openDetailScreen(MediaItem item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => MediaDetailScreen(item: item)),
+    );
+  }
+
   void _openSaveModal(MediaItem item) async {
-    // Show modal bottom sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -106,7 +113,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         padding: const EdgeInsets.all(16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.65,
+                          childAspectRatio: 0.62,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
@@ -116,7 +123,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           final imageUrl = ApiService.getFullImageUrl(item);
 
                           return GestureDetector(
-                            onTap: () => _openSaveModal(item),
+                            onTap: () => _openDetailScreen(item),
                             child: Container(
                               decoration: BoxDecoration(
                                 color: const Color(0xFF1E293B),
@@ -189,9 +196,25 @@ class _SearchScreenState extends State<SearchScreen> {
                                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                         ),
                                         const SizedBox(height: 2),
-                                        Text(
-                                          item.releaseDate.length >= 4 ? item.releaseDate.substring(0, 4) : '',
-                                          style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              item.releaseDate.length >= 4 ? item.releaseDate.substring(0, 4) : '',
+                                              style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                            ),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.amber,
+                                                foregroundColor: Colors.black,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                minimumSize: Size.zero,
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              onPressed: () => _openSaveModal(item),
+                                              child: const Text('+ Simpan', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
