@@ -277,20 +277,41 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: stillUrl.isNotEmpty
-                                      ? Image.network(stillUrl, width: 85, height: 55, fit: BoxFit.cover)
-                                      : Container(width: 85, height: 55, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24)),
+                                Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: stillUrl.isNotEmpty
+                                          ? Image.network(stillUrl, width: 110, height: 65, fit: BoxFit.cover)
+                                          : Container(width: 110, height: 65, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24, size: 28)),
+                                    ),
+                                    Positioned(
+                                      bottom: 4,
+                                      left: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.8),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Eps ${eps['episode_number']}',
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Eps ${eps['episode_number']}: ${eps['name'] ?? ''}',
+                                        eps['name'] ?? 'Episode ${eps['episode_number']}',
                                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       if (eps['air_date'] != null)
                                         Text('Tayang: ${eps['air_date']}', style: const TextStyle(color: Colors.white54, fontSize: 10)),
