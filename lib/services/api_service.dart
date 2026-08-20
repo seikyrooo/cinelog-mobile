@@ -234,16 +234,133 @@ class ApiService {
     return resp.statusCode == 200;
   }
 
+  static Future<List<MediaItem>> fetchTrendingMedia({String type = 'all', String time = 'week'}) async {
+    final url = Uri.parse('$baseUrl/api/trending?type=$type&time=$time');
+    try {
+      final resp = await http.get(url);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final List list = data['data'] ?? [];
+        return list.map((e) => MediaItem.fromSearchJson(e)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<MediaItem>> fetchDiscoverMedia({String type = 'movie', String sort = 'popularity.desc'}) async {
+    final url = Uri.parse('$baseUrl/api/discover?type=$type&sort=$sort');
+    try {
+      final resp = await http.get(url);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final List list = data['data'] ?? [];
+        return list.map((e) => MediaItem.fromSearchJson(e)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<CommunityUser>> fetchCommunityUsers({String? query}) async {
+    final token = await getToken();
+    final url = Uri.parse(query != null && query.isNotEmpty 
+      ? '$baseUrl/api/users/search?q=${Uri.encodeComponent(query)}'
+      : '$baseUrl/api/users/discover');
+    
+    final headers = <String, String>{};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    try {
+      final resp = await http.get(url, headers: headers);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final List list = data['data'] ?? [];
+        return list.map((e) => CommunityUser.fromJson(e)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<SocialActivityItem>> fetchSocialActivities({String type = 'following', int limit = 30}) async {
+    final token = await getToken();
+    final url = Uri.parse('$baseUrl/api/community/activity?type=$type&limit=$limit');
+    
+    final headers = <String, String>{};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    try {
+      final resp = await http.get(url, headers: headers);
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        final List list = data['data'] ?? [];
+        return list.map((e) => SocialActivityItem.fromJson(e)).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<bool> followUser(int userId) async {
+    final token = await getToken();
+    if (token == null) return false;
+    final url = Uri.parse('$baseUrl/api/me/follow/$userId');
+    try {
+      final resp = await http.post(url, headers: {'Authorization': 'Bearer $token'});
+      return resp.statusCode == 200 || resp.statusCode == 201;
+    } catch (_) {}
+    return false;
+  }
+
+  static Future<bool> unfollowUser(int userId) async {
+    final token = await getToken();
+    if (token == null) return false;
+    final url = Uri.parse('$baseUrl/api/me/follow/$userId');
+    try {
+      final resp = await http.delete(url, headers: {'Authorization': 'Bearer $token'});
+      return resp.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
   static String getFullImageUrl(MediaItem movie) {
     if (movie.localPosterPath.isNotEmpty) {
       if (movie.localPosterPath.startsWith('/')) {
-        return '$baseUrl${movie.localPosterPath}';
+        return '$baseUrl/api${movie.localPosterPath}';
       }
-      return '$baseUrl/${movie.localPosterPath}';
+      return '$baseUrl/api/${movie.localPosterPath}';
     }
     if (movie.posterPath.isNotEmpty) {
       return 'https://image.tmdb.org/t/p/w500${movie.posterPath}';
     }
     return '';
+  }
+
+  static String getFullBackdropUrl(MediaItem movie) {
+    if (movie.localBackdropPath.isNotEmpty) {
+      if (movie.localBackdropPath.startsWith('/')) {
+        return '$baseUrl/api${movie.localBackdropPath}';
+      }
+      return '$baseUrl/api/${movie.localBackdropPath}';
+    }
+    if (movie.backdropPath.isNotEmpty) {
+      return 'https://image.tmdb.org/t/p/w780${movie.backdropPath}';
+    }
+    return '';
+  }
+
+  static String getAvatarUrl(String avatarPath) {
+    if (avatarPath.isEmpty) return '';
+    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+      return avatarPath;
+    }
+    if (avatarPath.startsWith('/api/uploads/')) {
+      return '$baseUrl$avatarPath';
+    }
+    if (avatarPath.startsWith('/uploads/')) {
+      return '$baseUrl/api$avatarPath';
+    }
+    return '$baseUrl/api/uploads/avatars/$avatarPath';
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/search_screen.dart';
 import 'screens/watchlist_screen.dart';
+import 'screens/community_screen.dart';
 import 'screens/auth_screen.dart';
 
 void main() {
@@ -12,15 +14,29 @@ class CinelogApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const accentRed = Color(0xFFE50914);
+    const bgPrimary = Color(0xFF141414);
+    const bgSurface = Color(0xFF181818);
+    const bgCard = Color(0xFF1F1F1F);
+
     return MaterialApp(
-      title: 'Cinelog',
+      title: 'CineLog',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF07090E),
+        scaffoldBackgroundColor: bgPrimary,
+        primaryColor: accentRed,
         colorScheme: const ColorScheme.dark(
-          primary: Colors.amber,
-          secondary: Colors.purpleAccent,
-          surface: Color(0xFF0F172A),
+          primary: accentRed,
+          secondary: Color(0xFF46D369),
+          surface: bgSurface,
+          surfaceContainerHighest: bgCard,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: bgPrimary,
+          elevation: 0,
+        ),
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData.dark().textTheme,
         ),
       ),
       home: const MainNavigationScreen(),
@@ -40,43 +56,59 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = const [
     SearchScreen(),
-    WatchlistScreen(initialMediaType: 'tv'),
-    WatchlistScreen(initialMediaType: 'movie'),
+    WatchlistScreen(initialMediaType: 'all'),
+    CommunityScreen(),
     AuthScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
+    const accentRed = Color(0xFFE50914);
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        backgroundColor: const Color(0xFF0F172A),
-        selectedItemColor: Colors.amber,
-        unselectedItemColor: Colors.white38,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Eksplor',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF141414),
+          border: Border(
+            top: BorderSide(color: Colors.white.withOpacity(0.08), width: 0.8),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.tv),
-            label: 'TV Shows',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.movie),
-            label: 'Movies',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Akun',
-          ),
-        ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          backgroundColor: const Color(0xFF141414),
+          selectedItemColor: accentRed,
+          unselectedItemColor: Colors.white38,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 11),
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.explore_outlined),
+              activeIcon: Icon(Icons.explore),
+              label: 'Explore',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.bookmark_outline),
+              activeIcon: Icon(Icons.bookmark),
+              label: 'Watchlist',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              activeIcon: Icon(Icons.people),
+              label: 'Community',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Account',
+            ),
+          ],
+        ),
       ),
     );
   }

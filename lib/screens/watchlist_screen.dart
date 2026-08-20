@@ -523,14 +523,14 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          'TAMAT (${item.episodesWatched > 0 ? item.episodesWatched : totalEps} eps)',
+                          'COMPLETED (${item.episodesWatched > 0 ? item.episodesWatched : totalEps} eps)',
                           style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  const Text('Semua episode telah ditonton 100%', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const Text('All episodes watched', style: TextStyle(color: Colors.white70, fontSize: 12)),
                 ] else ...[
                   Row(
                     children: [
