@@ -403,11 +403,9 @@ class _WatchlistScreenState extends State<WatchlistScreen>
         ? 0
         : (totalEps > 0 ? (totalEps - item.episodesWatched) : 0);
 
-    final episodeTitle = isCompleted
-        ? 'Series Completed ✓'
-        : (item.movie.nextEpisodeName.isNotEmpty
-            ? item.movie.nextEpisodeName
-            : 'Episode $nextEpsNum');
+    final episodeTitle = item.movie.nextEpisodeName.isNotEmpty
+        ? item.movie.nextEpisodeName
+        : (isCompleted ? 'Final Episode' : 'Episode $nextEpsNum');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -566,28 +564,29 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                 ),
               ),
 
-              // Check button
-              IconButton(
-                icon: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: isCompleted ? AppColors.successGreen : AppColors.bgCard,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isCompleted ? AppColors.successGreen : AppColors.borderSubtle,
+              // Check button (only for unwatched episodes)
+              if (!isCompleted)
+                IconButton(
+                  icon: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.bgCard,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.borderSubtle,
+                      ),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.check_rounded,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
-                  child: Center(
-                    child: Icon(
-                      Icons.check_rounded,
-                      size: 20,
-                      color: isCompleted ? Colors.white : AppColors.textSecondary,
-                    ),
-                  ),
+                  onPressed: () => _incrementEpisode(item),
                 ),
-                onPressed: isCompleted ? null : () => _incrementEpisode(item),
-              ),
             ],
           ),
 
@@ -610,6 +609,138 @@ class _WatchlistScreenState extends State<WatchlistScreen>
     );
   }
 
+  Widget _buildMovieGrid(List<WatchlistItem> list) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.60,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+      ),
+      itemCount: list.length,
+      itemBuilder: (context, index) {
+        final item = list[index];
+        final imageUrl = ApiService.getFullImageUrl(item.movie);
+
+        return GestureDetector(
+          onTap: () => _openDetailScreen(item.movie),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderSubtle),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      imageUrl.isNotEmpty
+                          ? Image.network(imageUrl, fit: BoxFit.cover)
+                          : Container(color: AppColors.bgCard),
+                      if (item.rating > 0)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xD9000000),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rounded, color: AppColors.starGold, size: 12),
+                                const SizedBox(width: 2),
+                                Text(
+                                  item.rating.toStringAsFixed(1),
+                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.movie.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.textMuted),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            item.movie.releaseDate.length >= 4 ? item.movie.releaseDate.substring(0, 4) : '',
+                            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                          ),
+                          GestureDetector(
+                            onTap: () => _openEditModal(item),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: item.rating > 0 ? AppColors.starGoldSubtle : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: item.rating > 0 ? const Color(0x66FFB800) : AppColors.borderLight,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.star_rounded,
+                                    size: 11,
+                                    color: item.rating > 0 ? AppColors.starGold : AppColors.textMuted,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    item.rating > 0 ? item.rating.toStringAsFixed(1) : 'Rate',
+                                    style: TextStyle(
+                                      color: item.rating > 0 ? AppColors.starGold : AppColors.textSecondary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildMoviesExperience() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppColors.accentRed));
@@ -628,102 +759,36 @@ class _WatchlistScreenState extends State<WatchlistScreen>
       );
     }
 
+    final watchNextItems = _items.where((i) => i.status == 'plan_to_watch' || i.status == 'watching' || i.status.isEmpty).toList();
+    final onHoldItems = _items.where((i) => i.status == 'on_hold' || i.status == 'dropped').toList();
+    final completedItems = _items.where((i) => i.status == 'watched' || i.status == 'completed').toList();
+
     return RefreshIndicator(
       onRefresh: _fetchWatchlist,
       color: AppColors.accentRed,
       backgroundColor: AppColors.bgCard,
-      child: GridView.builder(
+      child: ListView(
         padding: const EdgeInsets.all(16),
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.60,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-        ),
-        itemCount: _items.length,
-        itemBuilder: (context, index) {
-          final item = _items[index];
-          final imageUrl = ApiService.getFullImageUrl(item.movie);
-
-          return GestureDetector(
-            onTap: () => _openDetailScreen(item.movie),
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.bgSurface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        imageUrl.isNotEmpty
-                            ? Image.network(imageUrl, fit: BoxFit.cover)
-                            : Container(color: AppColors.bgCard),
-                        if (item.rating > 0)
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xD9000000),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.star_rounded, color: AppColors.starGold, size: 12),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    item.rating.toStringAsFixed(1),
-                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.movie.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              item.movie.releaseDate.length >= 4 ? item.movie.releaseDate.substring(0, 4) : '',
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                            ),
-                            GestureDetector(
-                              onTap: () => _openEditModal(item),
-                              child: const Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.textMuted),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+        children: [
+          if (watchNextItems.isNotEmpty) ...[
+            _sectionPillBadge('WATCH NEXT', AppColors.accentRed, Colors.white),
+            const SizedBox(height: 12),
+            _buildMovieGrid(watchNextItems),
+            const SizedBox(height: 24),
+          ],
+          if (onHoldItems.isNotEmpty) ...[
+            _sectionPillBadge('ON HOLD', AppColors.bgElevated, AppColors.textSecondary),
+            const SizedBox(height: 12),
+            _buildMovieGrid(onHoldItems),
+            const SizedBox(height: 24),
+          ],
+          if (completedItems.isNotEmpty) ...[
+            _sectionPillBadge('COMPLETED', const Color(0xFF1E293B), const Color(0xFF4ADE80)),
+            const SizedBox(height: 12),
+            _buildMovieGrid(completedItems),
+          ],
+        ],
       ),
     );
   }
