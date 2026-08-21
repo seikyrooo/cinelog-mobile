@@ -758,6 +758,28 @@ class _WatchlistEditSheetState extends State<_WatchlistEditSheet> {
     }
   }
 
+  Future<void> _deleteRate() async {
+    setState(() {
+      _rating = 0.0;
+      _isSaving = true;
+    });
+    final isMovie = widget.item.movie.mediaType == 'movie';
+    await ApiService.updateWatchlist(
+      id: widget.item.id,
+      status: isMovie ? 'watching' : widget.item.status,
+      rating: 0.0,
+      favorite: _favorite,
+      notes: _notesController.text.trim(),
+      seasonWatched: widget.item.seasonWatched,
+      episodesWatched: widget.item.episodesWatched,
+      totalEpisodes: widget.item.totalEpisodes,
+    );
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    Navigator.pop(context);
+    widget.onSaved();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -813,40 +835,13 @@ class _WatchlistEditSheetState extends State<_WatchlistEditSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Score', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _rating > 0 ? '${_rating.toInt()} / 10' : 'Unrated',
-                      style: TextStyle(
-                        color: _rating > 0 ? AppColors.starGold : AppColors.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (_rating > 0) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => setState(() => _rating = 0.0),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0x33EF4444),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: const Color(0x66EF4444)),
-                          ),
-                          child: const Text(
-                            '✕ Hapus Rate',
-                            style: TextStyle(
-                              color: Color(0xFFEF4444),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  _rating > 0 ? '${_rating.toInt()} / 10' : 'Unrated',
+                  style: TextStyle(
+                    color: _rating > 0 ? AppColors.starGold : AppColors.textMuted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
@@ -914,15 +909,42 @@ class _WatchlistEditSheetState extends State<_WatchlistEditSheet> {
             ),
             const SizedBox(height: 16),
 
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                child: _isSaving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-              ),
+            Row(
+              children: [
+                if (widget.item.rating > 0 || _rating > 0) ...[
+                  Expanded(
+                    flex: 2,
+                    child: SizedBox(
+                      height: 46,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0x55EF4444)),
+                          backgroundColor: const Color(0x1AEF4444),
+                          foregroundColor: const Color(0xFFEF4444),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                        icon: const Icon(Icons.delete_sweep_rounded, size: 16, color: Color(0xFFEF4444)),
+                        label: const Text('Delete Rate', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                        onPressed: _isSaving ? null : _deleteRate,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  flex: 3,
+                  child: SizedBox(
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _save,
+                      child: _isSaving
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
