@@ -325,11 +325,23 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        item.movie.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white),
+                      GestureDetector(
+                        onTap: () => _openDetailScreen(item.movie),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                item.movie.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textMuted),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Container(
@@ -472,6 +484,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                     GestureDetector(
                       onTap: () => _openDetailScreen(item.movie),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Flexible(
                             child: Text(
@@ -485,6 +498,8 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textMuted),
                         ],
                       ),
                     ),
