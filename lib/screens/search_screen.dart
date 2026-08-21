@@ -789,31 +789,26 @@ class _QuickSaveSheet extends StatefulWidget {
 
 class _QuickSaveSheetState extends State<_QuickSaveSheet> {
   String _status = 'watching';
-  double _rating = 8.0;
   bool _favorite = false;
   final bool _isPublicFeed = true;
-  final TextEditingController _notesController = TextEditingController();
 
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _status = widget.item.mediaType == 'tv' ? 'watching' : 'completed';
+    _status = widget.item.mediaType == 'tv' ? 'watching' : 'plan_to_watch';
   }
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
 
-    final isMovie = widget.item.mediaType == 'movie';
-    final statusVal = (isMovie && _rating > 0) ? 'completed' : _status;
-
     final success = await ApiService.addToWatchlist(
       item: widget.item,
-      status: statusVal,
-      rating: _rating,
+      status: _status,
+      rating: 0,
       favorite: _favorite,
-      notes: _notesController.text.trim(),
+      notes: '',
       isPublicFeed: _isPublicFeed,
     );
 
@@ -884,74 +879,70 @@ class _QuickSaveSheetState extends State<_QuickSaveSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
 
-            // Score Chips (1 - 10)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Your Score',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700),
-                ),
-                Text(
-                  '${_rating.toInt()} / 10',
-                  style: const TextStyle(color: AppColors.starGold, fontSize: 13, fontWeight: FontWeight.w800),
-                ),
-              ],
+            // Status Selector Pills
+            const Text(
+              'Watchlist Category',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-
-            // 10-Chip Selector
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(10, (index) {
-                  final score = (index + 1).toDouble();
-                  final isSelected = _rating == score;
-                  return GestureDetector(
-                    onTap: () => setState(() {
-                      _rating = score;
-                      _status = 'completed';
-                    }),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _status = 'watching'),
                     child: Container(
-                      margin: const EdgeInsets.only(right: 6),
-                      width: 36,
-                      height: 36,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.accentRed : AppColors.bgCard,
+                        color: _status == 'watching' ? AppColors.accentRed : AppColors.bgCard,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isSelected ? AppColors.accentRed : AppColors.borderSubtle,
+                          color: _status == 'watching' ? AppColors.accentRed : AppColors.borderSubtle,
                         ),
                       ),
                       child: Center(
                         child: Text(
-                          '${index + 1}',
+                          widget.item.mediaType == 'tv' ? 'Watching' : 'Plan to Watch',
                           style: TextStyle(
-                            color: isSelected ? Colors.white : AppColors.textSecondary,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
+                            color: _status == 'watching' ? Colors.white : AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
                           ),
                         ),
                       ),
                     ),
-                  );
-                }),
-              ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _status = 'completed'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: _status == 'completed' ? AppColors.accentRed : AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _status == 'completed' ? AppColors.accentRed : AppColors.borderSubtle,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Completed',
+                          style: TextStyle(
+                            color: _status == 'completed' ? Colors.white : AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-
-            // Notes / Review
-            TextField(
-              controller: _notesController,
-              maxLines: 2,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              decoration: const InputDecoration(
-                hintText: 'Add a quick review or favorite moment (optional)...',
-              ),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
             // Toggle Switches
             SwitchListTile(
