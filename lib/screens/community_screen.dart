@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/media_item.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import 'media_detail_screen.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -10,7 +12,7 @@ class CommunityScreen extends StatefulWidget {
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProviderStateMixin {
+class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
@@ -19,6 +21,9 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
   bool _isLoadingActivities = false;
   bool _isLoadingUsers = false;
   final Map<int, bool> _togglingFollow = {};
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -75,7 +80,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
         user.isFollowing = currentlyFollowing;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal memperbarui status follow')),
+        const SnackBar(content: Text('Failed to update follow status')),
       );
     }
     if (mounted) {
@@ -85,112 +90,101 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    const accentRed = Color(0xFFE50914);
-    const bgSurface = Color(0xFF181818);
-    const bgCard = Color(0xFF1F1F1F);
+    super.build(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF141414),
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF141414),
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accentRed.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: accentRed.withOpacity(0.4)),
-              ),
-              child: const Icon(Icons.people_alt, color: accentRed, size: 18),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Community',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 20,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
+        backgroundColor: AppColors.bgPrimary,
+        title: Text(
+          'Community',
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.w900,
+            fontSize: 22,
+            letterSpacing: -0.5,
+          ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
+            onPressed: () {
+              if (_tabController.index == 0) {
+                _loadActivities();
+              } else {
+                _loadUsers(_searchController.text.trim());
+              }
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: accentRed,
-          indicatorWeight: 3,
+          indicatorColor: AppColors.accentRed,
+          indicatorWeight: 2.5,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white54,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          unselectedLabelColor: AppColors.textMuted,
+          labelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 12, letterSpacing: 0.5),
           tabs: const [
-            Tab(icon: Icon(Icons.bolt, size: 18), text: 'Activity Feed'),
-            Tab(icon: Icon(Icons.explore, size: 18), text: 'Discover Cinephiles'),
+            Tab(text: 'ACTIVITY FEED'),
+            Tab(text: 'DISCOVER CINEPHILES'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Tab 1: Following Activity Stream
-          _buildActivityTab(accentRed, bgSurface, bgCard),
-          // Tab 2: Discover Cinephiles
-          _buildDiscoverTab(accentRed, bgSurface, bgCard),
+          _buildActivityTab(),
+          _buildDiscoverTab(),
         ],
       ),
     );
   }
 
-  Widget _buildActivityTab(Color accentRed, Color bgSurface, Color bgCard) {
+  Widget _buildActivityTab() {
     if (_isLoadingActivities) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFE50914)));
+      return const Center(child: CircularProgressIndicator(color: AppColors.accentRed));
     }
 
     if (_activities.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadActivities,
-        color: accentRed,
+        color: AppColors.accentRed,
+        backgroundColor: AppColors.bgCard,
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 60),
           children: [
             Center(
               child: Container(
-                width: 70,
-                height: 70,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
+                  color: AppColors.bgSurface,
                   shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.borderSubtle),
                 ),
-                child: const Icon(Icons.bolt, color: Colors.white38, size: 36),
+                child: const Icon(Icons.forum_outlined, color: AppColors.textMuted, size: 30),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             const Center(
               child: Text(
-                'Belum Ada Aktivitas',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+                'No Activity Yet',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Colors.white),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Center(
               child: Text(
-                'Ikuti pecinta film lain di tab Discover Cinephiles untuk melihat ulasan dan rating mereka di sini!',
+                'Follow other movie lovers in the Discover tab to see their reviews and scores here.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.4),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12, height: 1.4),
               ),
             ),
             const SizedBox(height: 20),
             Center(
               child: ElevatedButton.icon(
                 onPressed: () => _tabController.animateTo(1),
-                icon: const Icon(Icons.search, size: 16),
-                label: const Text('Cari Teman Cinephile'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentRed,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
+                icon: const Icon(Icons.search_rounded, size: 16),
+                label: const Text('Find Cinephiles'),
               ),
             ),
           ],
@@ -200,19 +194,21 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
 
     return RefreshIndicator(
       onRefresh: _loadActivities,
-      color: accentRed,
+      color: AppColors.accentRed,
+      backgroundColor: AppColors.bgCard,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.all(14),
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         itemCount: _activities.length,
         itemBuilder: (context, index) {
           final act = _activities[index];
-          return _buildActivityCard(act, accentRed, bgCard);
+          return _buildActivityCard(act);
         },
       ),
     );
   }
 
-  Widget _buildActivityCard(SocialActivityItem act, Color accentRed, Color bgCard) {
+  Widget _buildActivityCard(SocialActivityItem act) {
     final hasReview = act.review.isNotEmpty || act.notes.isNotEmpty;
     final reviewText = act.review.isNotEmpty ? act.review : act.notes;
 
@@ -220,9 +216,9 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,8 +227,8 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
           Row(
             children: [
               CircleAvatar(
-                radius: 18,
-                backgroundColor: accentRed.withOpacity(0.2),
+                radius: 17,
+                backgroundColor: AppColors.accentRedSubtle,
                 backgroundImage: act.user != null && act.user!.avatarUrl.isNotEmpty
                     ? NetworkImage(ApiService.getAvatarUrl(act.user!.avatarUrl))
                     : null,
@@ -241,7 +237,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                         act.user != null && act.user!.username.isNotEmpty
                             ? act.user!.username.substring(0, 1).toUpperCase()
                             : 'C',
-                        style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: AppColors.accentRed, fontWeight: FontWeight.w800, fontSize: 12),
                       )
                     : null,
               ),
@@ -252,31 +248,31 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                   children: [
                     Text(
                       '@${act.user?.username ?? "cinephile"}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                     ),
                     Text(
                       _getActivitySubtitle(act),
-                      style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
                     ),
                   ],
                 ),
               ),
               if (act.rating > 0)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.15),
+                    color: AppColors.starGoldSubtle,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.amber.withOpacity(0.4)),
+                    border: Border.all(color: const Color(0x66FFB800)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 14),
-                      const SizedBox(width: 3),
+                      const Icon(Icons.star_rounded, color: AppColors.starGold, size: 13),
+                      const SizedBox(width: 2),
                       Text(
                         act.rating.toStringAsFixed(1),
-                        style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w900, fontSize: 12),
+                        style: const TextStyle(color: AppColors.starGold, fontWeight: FontWeight.w900, fontSize: 11),
                       ),
                     ],
                   ),
@@ -285,7 +281,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
           ),
           const SizedBox(height: 12),
 
-          // Media Thumbnail & Info Box (Tappable to Detail)
+          // Media Thumbnail Box
           GestureDetector(
             onTap: () {
               Navigator.push(
@@ -298,25 +294,25 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.borderSubtle),
               ),
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                     child: Container(
                       width: 44,
                       height: 64,
-                      color: Colors.white10,
+                      color: AppColors.bgPrimary,
                       child: act.movie.posterPath.isNotEmpty || act.movie.localPosterPath.isNotEmpty
                           ? Image.network(
                               ApiService.getFullImageUrl(act.movie),
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.white24),
+                              errorBuilder: (_, __, ___) => const Icon(Icons.movie_outlined, color: AppColors.textMuted),
                             )
-                          : const Icon(Icons.movie, color: Colors.white24),
+                          : const Icon(Icons.movie_outlined, color: AppColors.textMuted),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -328,33 +324,33 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                           act.movie.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
+                                color: AppColors.bgPrimary,
                                 borderRadius: BorderRadius.circular(3),
                               ),
                               child: Text(
                                 act.movie.mediaType.toUpperCase(),
-                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white70),
+                                style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: AppColors.textSecondary),
                               ),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               act.movie.releaseDate.length >= 4 ? act.movie.releaseDate.substring(0, 4) : '',
-                              style: const TextStyle(color: Colors.white38, fontSize: 11),
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.white38),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 18),
                 ],
               ),
             ),
@@ -365,19 +361,19 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(6),
-                  bottomRight: Radius.circular(6),
+              decoration: const BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
                 ),
-                border: Border(left: BorderSide(color: accentRed, width: 3)),
+                border: Border(left: BorderSide(color: AppColors.accentRed, width: 3)),
               ),
               child: Text(
                 '"$reviewText"',
                 style: const TextStyle(
                   fontStyle: FontStyle.italic,
-                  color: Colors.white70,
+                  color: AppColors.textSecondary,
                   fontSize: 12,
                   height: 1.4,
                 ),
@@ -391,83 +387,85 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
 
   String _getActivitySubtitle(SocialActivityItem act) {
     if (act.review.isNotEmpty || act.notes.isNotEmpty) {
-      return 'memberikan ulasan & rating';
+      return 'wrote a review';
     }
     if (act.status == 'completed') {
-      return 'selesai menonton';
+      return 'completed';
     }
     if (act.status == 'watching') {
       if (act.movie.mediaType == 'tv' && act.episodesWatched > 0) {
-        return 'sedang menonton (Eps ${act.episodesWatched})';
+        return 'watching (Ep ${act.episodesWatched})';
       }
-      return 'sedang menonton';
+      return 'started watching';
     }
     if (act.favorite) {
-      return 'menambahkan ke favorit';
+      return 'favorited';
     }
-    return 'mencatat tontonan';
+    return 'logged an update';
   }
 
-  Widget _buildDiscoverTab(Color accentRed, Color bgSurface, Color bgCard) {
+  Widget _buildDiscoverTab() {
     return Column(
       children: [
         // Search bar
         Padding(
           padding: const EdgeInsets.all(14),
-          child: TextField(
-            controller: _searchController,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'Cari username atau bio...',
-              hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-              prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 20),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.white38, size: 18),
-                      onPressed: () {
-                        _searchController.clear();
-                        _loadUsers();
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: bgSurface,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: accentRed),
-              ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.borderSubtle),
             ),
-            onChanged: (val) {
-              _loadUsers(val.trim());
-            },
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'Search username or bio...',
+                hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, color: AppColors.textMuted, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          _loadUsers();
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+              onChanged: (val) {
+                _loadUsers(val.trim());
+              },
+            ),
           ),
         ),
 
         // User list
         Expanded(
           child: _isLoadingUsers
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFFE50914)))
+              ? const Center(child: CircularProgressIndicator(color: AppColors.accentRed))
               : _users.isEmpty
                   ? Center(
                       child: Text(
-                        _searchController.text.isNotEmpty ? 'Tidak ada user ditemukan' : 'Belum ada profil publik',
-                        style: const TextStyle(color: Colors.white54),
+                        _searchController.text.isNotEmpty ? 'No users found' : 'No public profiles yet',
+                        style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     )
                   : RefreshIndicator(
                       onRefresh: () => _loadUsers(_searchController.text.trim()),
-                      color: accentRed,
+                      color: AppColors.accentRed,
+                      backgroundColor: AppColors.bgCard,
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 14),
+                        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                         itemCount: _users.length,
                         itemBuilder: (context, index) {
                           final user = _users[index];
-                          return _buildUserCard(user, accentRed, bgCard);
+                          return _buildUserCard(user);
                         },
                       ),
                     ),
@@ -476,14 +474,14 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildUserCard(CommunityUser user, Color accentRed, Color bgCard) {
+  Widget _buildUserCard(CommunityUser user) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,15 +489,15 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
           Row(
             children: [
               CircleAvatar(
-                radius: 20,
-                backgroundColor: accentRed.withOpacity(0.2),
+                radius: 19,
+                backgroundColor: AppColors.accentRedSubtle,
                 backgroundImage: user.avatarUrl.isNotEmpty
                     ? NetworkImage(ApiService.getAvatarUrl(user.avatarUrl))
                     : null,
                 child: user.avatarUrl.isEmpty
                     ? Text(
                         user.username.isNotEmpty ? user.username.substring(0, 1).toUpperCase() : 'U',
-                        style: const TextStyle(color: Color(0xFFFF6B6B), fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: AppColors.accentRed, fontWeight: FontWeight.w800),
                       )
                     : null,
               ),
@@ -510,14 +508,14 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                   children: [
                     Text(
                       '@${user.username}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.white),
                     ),
                     if (user.bio.isNotEmpty)
                       Text(
                         user.bio,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                       ),
                   ],
                 ),
@@ -526,27 +524,27 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
                 ElevatedButton(
                   onPressed: () => _toggleFollow(user),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: user.isFollowing ? Colors.green.withOpacity(0.2) : accentRed,
-                    foregroundColor: user.isFollowing ? Colors.greenAccent : Colors.white,
-                    side: user.isFollowing ? const BorderSide(color: Colors.greenAccent, width: 0.8) : null,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    backgroundColor: user.isFollowing ? AppColors.bgElevated : AppColors.accentRed,
+                    foregroundColor: user.isFollowing ? AppColors.textSecondary : Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     minimumSize: const Size(60, 32),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   ),
                   child: Text(
-                    user.isFollowing ? 'Following ✓' : '+ Follow',
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    user.isFollowing ? 'Following' : 'Follow',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
+
           // Stats Row
           Container(
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(6),
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -571,7 +569,7 @@ class _CommunityScreenState extends State<CommunityScreen> with SingleTickerProv
         ),
         Text(
           label.toUpperCase(),
-          style: const TextStyle(fontSize: 8, color: Colors.white38, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 8, color: AppColors.textMuted, fontWeight: FontWeight.w800, letterSpacing: 0.5),
         ),
       ],
     );

@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/media_item.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 import 'media_detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -10,28 +13,90 @@ class SearchScreen extends StatefulWidget {
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
-  final TextEditingController _searchController = TextEditingController(text: 'Breaking Bad');
+class _SearchScreenState extends State<SearchScreen> with AutomaticKeepAliveClientMixin {
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
+
   String _selectedType = 'all';
-  bool _isLoading = false;
-  List<MediaItem> _results = [];
+  bool _isSearching = false;
+  bool _isLoadingResults = false;
+  List<MediaItem> _searchResults = [];
+
+  // Discovery Shelves
+  bool _isLoadingShelves = true;
+  List<MediaItem> _trendingList = [];
+  List<MediaItem> _popularMovies = [];
+  List<MediaItem> _topShows = [];
+  MediaItem? _spotlightItem;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _performSearch();
+    _loadDiscoveryFeeds();
   }
 
-  Future<void> _performSearch() async {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
 
-    setState(() => _isLoading = true);
-    final items = await ApiService.searchMedia(query, type: _selectedType);
-    setState(() {
-      _results = items;
-      _isLoading = false;
+  Future<void> _loadDiscoveryFeeds() async {
+    setState(() => _isLoadingShelves = true);
+    try {
+      final trending = await ApiService.fetchTrendingMedia(type: 'all', time: 'week');
+      final movies = await ApiService.fetchDiscoverMedia(type: 'movie', sort: 'popularity.desc');
+      final tv = await ApiService.fetchDiscoverMedia(type: 'tv', sort: 'popularity.desc');
+
+      if (mounted) {
+        setState(() {
+          _trendingList = trending;
+          _popularMovies = movies;
+          _topShows = tv;
+          if (trending.isNotEmpty) {
+            _spotlightItem = trending.first;
+          }
+          _isLoadingShelves = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingShelves = false);
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    if (query.trim().isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = [];
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      _performSearch(query.trim());
     });
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.isEmpty) return;
+    setState(() {
+      _isSearching = true;
+      _isLoadingResults = true;
+    });
+
+    final items = await ApiService.searchMedia(query, type: _selectedType);
+    if (mounted) {
+      setState(() {
+        _searchResults = items;
+        _isLoadingResults = false;
+      });
+    }
   }
 
   void _openDetailScreen(MediaItem item) {
@@ -41,291 +106,728 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  void _openSaveModal(MediaItem item) async {
+  void _openSaveModal(MediaItem item) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _SaveModalSheet(item: item),
+      builder: (context) => _QuickSaveSheet(item: item),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        title: const Text('Cari Film & TV Shows', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1E293B),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Search & Filter Box
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: const Color(0xFF1E293B),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Cari judul film atau series...',
-                    hintStyle: const TextStyle(color: Colors.white54),
-                    filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    prefixIcon: const Icon(Icons.search, color: Colors.amber),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.amber),
-                      onPressed: _performSearch,
-                    ),
-                  ),
-                  onSubmitted: (_) => _performSearch(),
-                ),
-                const SizedBox(height: 12),
-                Row(
+      backgroundColor: AppColors.bgPrimary,
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          onRefresh: _loadDiscoveryFeeds,
+          color: AppColors.accentRed,
+          backgroundColor: AppColors.bgCard,
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            slivers: [
+              // Sleek App Bar with Logo
+              SliverAppBar(
+                floating: true,
+                pinned: false,
+                snap: true,
+                backgroundColor: const Color(0xF2101012),
+                title: Row(
                   children: [
-                    _filterChip('Semua', 'all'),
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: AppColors.accentRed,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'C',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    _filterChip('Movies', 'movie'),
-                    const SizedBox(width: 8),
-                    _filterChip('TV Shows', 'tv'),
+                    Text(
+                      'CINELOG',
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        fontSize: 18,
+                        color: Colors.white,
+                      ),
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
+                actions: [
+                  if (_isSearching)
+                    TextButton(
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _isSearching = false;
+                          _searchResults = [];
+                        });
+                      },
+                      child: const Text('Cancel', style: TextStyle(color: AppColors.accentRed, fontWeight: FontWeight.bold)),
+                    ),
+                ],
+              ),
 
-          // Search Results
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.amber))
-                : _results.isEmpty
-                    ? const Center(
-                        child: Text('Tidak ada hasil ditemukan', style: TextStyle(color: Colors.white54)),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.62,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
+              // Search Bar & Filter Header
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    children: [
+                      // Modern Search Box
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.bgSurface,
+                          borderRadius: BorderRadius.circular(50),
+                          border: Border.all(color: AppColors.borderLight),
                         ),
-                        itemCount: _results.length,
-                        itemBuilder: (context, index) {
-                          final item = _results[index];
-                          final imageUrl = ApiService.getFullImageUrl(item);
-
-                          return GestureDetector(
-                            onTap: () => _openDetailScreen(item),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E293B),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Stack(
-                                      children: [
-                                        imageUrl.isNotEmpty
-                                            ? Image.network(
-                                                imageUrl,
-                                                width: double.infinity,
-                                                height: double.infinity,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) => const Center(
-                                                  child: Icon(Icons.movie, size: 48, color: Colors.white24),
-                                                ),
-                                              )
-                                            : const Center(
-                                                child: Icon(Icons.movie, size: 48, color: Colors.white24),
-                                              ),
-                                        Positioned(
-                                          top: 8,
-                                          left: 8,
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: item.mediaType == 'tv' ? Colors.purple : Colors.blue,
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              item.mediaType == 'tv' ? 'TV Show' : 'Movie',
-                                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                            ),
-                                          ),
-                                        ),
-                                        if (item.voteAverage > 0)
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.black87,
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                '★ ${item.voteAverage.toStringAsFixed(1)}',
-                                                style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              item.releaseDate.length >= 4 ? item.releaseDate.substring(0, 4) : '',
-                                              style: const TextStyle(color: Colors.white54, fontSize: 11),
-                                            ),
-                                            ElevatedButton(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: Colors.amber,
-                                                foregroundColor: Colors.black,
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                minimumSize: Size.zero,
-                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                              ),
-                                              onPressed: () => _openSaveModal(item),
-                                              child: const Text('+ Simpan', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          onChanged: _onSearchChanged,
+                          onSubmitted: (val) => _performSearch(val.trim()),
+                          decoration: InputDecoration(
+                            hintText: 'Search movies, TV series, anime...',
+                            hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                            prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear_rounded, color: AppColors.textMuted, size: 18),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {
+                                        _isSearching = false;
+                                        _searchResults = [];
+                                      });
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: 12),
+
+                      // Filter Pills
+                      Row(
+                        children: [
+                          _buildFilterChip('All', 'all'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Movies', 'movie'),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('TV Shows', 'tv'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Body Content
+              if (_isSearching) ...[
+                _buildSearchResultsSliver(),
+              ] else if (_isLoadingShelves) ...[
+                const SliverFillRemaining(
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.accentRed),
+                  ),
+                ),
+              ] else ...[
+                // Spotlight Hero Card
+                if (_spotlightItem != null)
+                  SliverToBoxAdapter(
+                    child: _buildSpotlightHero(_spotlightItem!),
+                  ),
+
+                // Shelf 1: Trending This Week
+                if (_trendingList.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildMediaShelf(
+                      title: 'Trending This Week',
+                      subtitle: 'Most watched worldwide',
+                      items: _trendingList,
+                    ),
+                  ),
+
+                // Shelf 2: Popular Movies
+                if (_popularMovies.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildMediaShelf(
+                      title: 'Popular Movies',
+                      subtitle: 'Blockbusters and award winners',
+                      items: _popularMovies,
+                    ),
+                  ),
+
+                // Shelf 3: Top TV Shows
+                if (_topShows.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: _buildMediaShelf(
+                      title: 'Top TV Series',
+                      subtitle: 'Binge-worthy shows',
+                      items: _topShows,
+                    ),
+                  ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 40)),
+              ],
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _filterChip(String label, String value) {
+  Widget _buildFilterChip(String label, String value) {
     final isSelected = _selectedType == value;
-    return ChoiceChip(
-      label: Text(label, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontSize: 12)),
-      selected: isSelected,
-      selectedColor: Colors.amber,
-      backgroundColor: const Color(0xFF0F172A),
-      onSelected: (selected) {
-        if (selected) {
-          setState(() => _selectedType = value);
-          _performSearch();
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedType = value);
+        if (_searchController.text.trim().isNotEmpty) {
+          _performSearch(_searchController.text.trim());
         }
       },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accentRed : AppColors.bgSurface,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
+            color: isSelected ? AppColors.accentRed : AppColors.borderSubtle,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpotlightHero(MediaItem item) {
+    final backdropUrl = ApiService.getFullBackdropUrl(item);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: GestureDetector(
+        onTap: () => _openDetailScreen(item),
+        child: Container(
+          height: 220,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x80000000),
+                blurRadius: 20,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (backdropUrl.isNotEmpty)
+                Image.network(
+                  backdropUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(color: AppColors.bgCard),
+                )
+              else
+                Container(color: AppColors.bgCard),
+
+              // Gradient Overlay
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Color(0x66000000),
+                      Color(0xF2101012),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Content Details
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentRed,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'FEATURED',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        if (item.voteAverage > 0) ...[
+                          const SizedBox(width: 8),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, color: AppColors.starGold, size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                item.voteAverage.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.overview,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaShelf({
+    required String title,
+    required String subtitle,
+    required List<MediaItem> items,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentRed,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 190,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return _buildShelfCard(item);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShelfCard(MediaItem item) {
+    final posterUrl = ApiService.getFullImageUrl(item);
+
+    return GestureDetector(
+      onTap: () => _openDetailScreen(item),
+      child: Container(
+        width: 110,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 150,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.borderSubtle),
+                color: AppColors.bgCard,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (posterUrl.isNotEmpty)
+                    Image.network(
+                      posterUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(
+                        child: Icon(Icons.movie_outlined, color: AppColors.textMuted, size: 28),
+                      ),
+                    )
+                  else
+                    const Center(
+                      child: Icon(Icons.movie_outlined, color: AppColors.textMuted, size: 28),
+                    ),
+                  if (item.voteAverage > 0)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xCC000000),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded, color: AppColors.starGold, size: 10),
+                            const SizedBox(width: 2),
+                            Text(
+                              item.voteAverage.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultsSliver() {
+    if (_isLoadingResults) {
+      return const SliverFillRemaining(
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.accentRed),
+        ),
+      );
+    }
+
+    if (_searchResults.isEmpty) {
+      return SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.search_off_rounded, color: AppColors.textMuted, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'No results found for "${_searchController.text}"',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.all(16),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 0.58,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final item = _searchResults[index];
+            return _buildSearchResultCard(item);
+          },
+          childCount: _searchResults.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultCard(MediaItem item) {
+    final posterUrl = ApiService.getFullImageUrl(item);
+
+    return GestureDetector(
+      onTap: () => _openDetailScreen(item),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.bgSurface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (posterUrl.isNotEmpty)
+                    Image.network(
+                      posterUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.bgCard,
+                        child: const Icon(Icons.movie_outlined, color: AppColors.textMuted),
+                      ),
+                    )
+                  else
+                    Container(
+                      color: AppColors.bgCard,
+                      child: const Icon(Icons.movie_outlined, color: AppColors.textMuted),
+                    ),
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: item.mediaType == 'tv' ? AppColors.accentRed : Colors.white24,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        item.mediaType == 'tv' ? 'TV' : 'MOVIE',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (item.voteAverage > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xD9000000),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded, color: AppColors.starGold, size: 12),
+                            const SizedBox(width: 2),
+                            Text(
+                              item.voteAverage.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        item.releaseDate.length >= 4 ? item.releaseDate.substring(0, 4) : '',
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      ),
+                      GestureDetector(
+                        onTap: () => _openSaveModal(item),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentRedSubtle,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.accentRedBorder),
+                          ),
+                          child: const Text(
+                            '+ Log',
+                            style: TextStyle(
+                              color: AppColors.accentRed,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _SaveModalSheet extends StatefulWidget {
+class _QuickSaveSheet extends StatefulWidget {
   final MediaItem item;
-
-  const _SaveModalSheet({required this.item});
+  const _QuickSaveSheet({required this.item});
 
   @override
-  State<_SaveModalSheet> createState() => _SaveModalSheetState();
+  State<_QuickSaveSheet> createState() => _QuickSaveSheetState();
 }
 
-class _SaveModalSheetState extends State<_SaveModalSheet> {
+class _QuickSaveSheetState extends State<_QuickSaveSheet> {
   String _status = 'watching';
-  double _rating = 4.0;
+  double _rating = 8.0;
   bool _favorite = false;
+  final bool _isPublicFeed = true;
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _seasonController = TextEditingController(text: '1');
-  final TextEditingController _episodesController = TextEditingController(text: '0');
-  final TextEditingController _totalEpisodesController = TextEditingController(text: '0');
 
-  bool _isFetchingDetail = true;
   bool _isSaving = false;
-  Map<String, dynamic>? _detailData;
 
   @override
   void initState() {
     super.initState();
     _status = widget.item.mediaType == 'tv' ? 'watching' : 'completed';
-    _loadDetail();
-  }
-
-  Future<void> _loadDetail() async {
-    final detail = await ApiService.fetchMediaDetail(widget.item.tmdbId, widget.item.mediaType);
-    if (mounted) {
-      setState(() {
-        _detailData = detail;
-        _isFetchingDetail = false;
-        if (detail != null && detail['total_episodes'] != null) {
-          _totalEpisodesController.text = detail['total_episodes'].toString();
-        }
-      });
-    }
   }
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
 
+    final isMovie = widget.item.mediaType == 'movie';
+    final statusVal = (isMovie && _rating > 0) ? 'completed' : _status;
+
     final success = await ApiService.addToWatchlist(
       item: widget.item,
-      status: _status,
+      status: statusVal,
       rating: _rating,
       favorite: _favorite,
       notes: _notesController.text.trim(),
-      seasonWatched: int.tryParse(_seasonController.text) ?? 1,
-      episodesWatched: int.tryParse(_episodesController.text) ?? 0,
-      totalEpisodes: int.tryParse(_totalEpisodesController.text) ?? 0,
-      director: _detailData?['director'] ?? '',
-      cast: _detailData?['cast'] ?? '',
-      nextAirDate: _detailData?['next_air_date'] ?? '',
-      nextEpisodeName: _detailData?['next_episode_name'] ?? '',
+      isPublicFeed: _isPublicFeed,
     );
 
     if (mounted) {
       setState(() => _isSaving = false);
-      if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Berhasil disimpan ke watchlist'),
-            backgroundColor: Colors.green,
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success ? 'Added to watchlist' : 'Failed to save. Please login first.',
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal menyimpan ke watchlist. Pastikan kamu sudah login.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+          backgroundColor: success ? AppColors.bgElevated : const Color(0xFFEF4444),
+        ),
+      );
     }
   }
 
@@ -336,224 +838,139 @@ class _SaveModalSheetState extends State<_SaveModalSheet> {
         left: 20,
         right: 20,
         top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E293B),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border.all(color: AppColors.borderLight),
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Handle Bar
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
                     widget.item.title,
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
+                  icon: const Icon(Icons.close_rounded, color: AppColors.textMuted),
                   onPressed: () => Navigator.pop(context),
-                )
+                ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              '${widget.item.mediaType == 'tv' ? 'TV Show' : 'Movie'} • ${widget.item.releaseDate.length >= 4 ? widget.item.releaseDate.substring(0, 4) : ''}',
-              style: const TextStyle(color: Colors.amber, fontSize: 12),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
-            // Detail Box (Director, Cast, Seasons)
-            if (_isFetchingDetail)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: Text('Memuat detail sutradara & episode...', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              )
-            else if (_detailData != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white10),
+            // Score Chips (1 - 10)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Your Score',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if ((_detailData!['director'] ?? '').isNotEmpty)
-                      Text('Sutradara/Kreator: ${_detailData!['director']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                    if ((_detailData!['cast'] ?? '').isNotEmpty)
-                      Text('Pemeran: ${_detailData!['cast']}', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                    if (widget.item.mediaType == 'tv' && _detailData!['next_air_date'] != null && (_detailData!['next_air_date'] as String).isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6.0),
-                        child: Text(
-                          '📅 Episode berikutnya: ${_detailData!['next_air_date']}',
-                          style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                Text(
+                  '${_rating.toInt()} / 10',
+                  style: const TextStyle(color: AppColors.starGold, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // 10-Chip Selector
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: List.generate(10, (index) {
+                  final score = (index + 1).toDouble();
+                  final isSelected = _rating == score;
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      _rating = score;
+                      _status = 'completed';
+                    }),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.accentRed : AppColors.bgCard,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected ? AppColors.accentRed : AppColors.borderSubtle,
                         ),
                       ),
-                  ],
-                ),
-              ),
-
-            // Status Dropdown
-            const Text('Status Tontonan', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _status,
-                  dropdownColor: const Color(0xFF0F172A),
-                  isExpanded: true,
-                  style: const TextStyle(color: Colors.white),
-                  items: const [
-                    DropdownMenuItem(value: 'watching', child: Text('Sedang Nonton (Watching)')),
-                    DropdownMenuItem(value: 'completed', child: Text('Selesai (Completed)')),
-                    DropdownMenuItem(value: 'plan_to_watch', child: Text('Rencana Nonton (Plan to Watch)')),
-                    DropdownMenuItem(value: 'on_hold', child: Text('Ditunda (On Hold)')),
-                    DropdownMenuItem(value: 'dropped', child: Text('Dihentikan (Dropped)')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _status = val);
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // 5-Star Rating Selector
-            const Text('Rating Kamu (1 - 5 Bintang)', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                for (int star = 1; star <= 5; star++)
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: Icon(
-                      star <= _rating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                      size: 28,
-                    ),
-                    onPressed: () => setState(() => _rating = star.toDouble()),
-                  ),
-                const SizedBox(width: 12),
-                Text(
-                  '${_rating.toStringAsFixed(1)} / 5.0',
-                  style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // TV Episode Progress (If TV Show)
-            if (widget.item.mediaType == 'tv') ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Season', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _seasonController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      child: Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.textSecondary,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Eps Ditonton', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _episodesController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Total Eps', style: TextStyle(color: Colors.white70, fontSize: 11)),
-                        const SizedBox(height: 4),
-                        TextField(
-                          controller: _totalEpisodesController,
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  );
+                }),
               ),
-              const SizedBox(height: 14),
-            ],
-
-            // Favorite checkbox
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Tandai sebagai Favorit', style: TextStyle(color: Colors.white, fontSize: 13)),
-              value: _favorite,
-              activeColor: Colors.amber,
-              onChanged: (val) => setState(() => _favorite = val ?? false),
             ),
+            const SizedBox(height: 16),
 
-            // Save Button
+            // Notes / Review
+            TextField(
+              controller: _notesController,
+              maxLines: 2,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                hintText: 'Add a quick review or favorite moment (optional)...',
+              ),
+            ),
             const SizedBox(height: 12),
+
+            // Toggle Switches
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Add to Favorites', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+              value: _favorite,
+              activeThumbColor: AppColors.accentRed,
+              onChanged: (val) => setState(() => _favorite = val),
+            ),
+
+            const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               height: 46,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
                 onPressed: _isSaving ? null : _save,
                 child: _isSaving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                    : const Text('Simpan ke Watchlist', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Save to Watchlist', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
               ),
             ),
           ],

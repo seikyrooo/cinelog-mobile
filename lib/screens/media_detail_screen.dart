@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/media_item.dart';
 import '../services/api_service.dart';
+import '../theme/app_theme.dart';
 
 class MediaDetailScreen extends StatefulWidget {
   final MediaItem item;
@@ -19,10 +21,27 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   bool _isLoadingEpisodes = false;
   List<dynamic> _episodes = [];
 
+  // Watchlist state for this item
+  bool _isInWatchlist = false;
+  WatchlistItem? _watchlistItem;
+  bool _isSavingProgress = false;
+
   @override
   void initState() {
     super.initState();
     _loadDetail();
+    _checkWatchlistStatus();
+  }
+
+  Future<void> _checkWatchlistStatus() async {
+    final list = await ApiService.getWatchlist(mediaType: widget.item.mediaType);
+    final found = list.where((i) => i.movie.tmdbId == widget.item.tmdbId || i.movieId == widget.item.id).toList();
+    if (found.isNotEmpty && mounted) {
+      setState(() {
+        _isInWatchlist = true;
+        _watchlistItem = found.first;
+      });
+    }
   }
 
   Future<void> _loadDetail() async {
@@ -54,49 +73,102 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
+  bool _isEpisodeWatched(int episodeNumber) {
+    if (_watchlistItem == null) return false;
+    final total = widget.item.totalEpisodes > 0 ? widget.item.totalEpisodes : (_detailData?['total_episodes'] ?? 0);
+    if (total > 0 && _watchlistItem!.episodesWatched >= total) return true;
+    // Calculate cumulative episode index
+    final cumulative = ((_selectedSeason - 1) * 10) + episodeNumber;
+    return cumulative <= _watchlistItem!.episodesWatched;
+  }
+
+  Future<void> _toggleEpisode(int episodeNumber) async {
+    if (_isSavingProgress) return;
+    setState(() => _isSavingProgress = true);
+
+    if (!_isInWatchlist) {
+      // Auto add to watchlist
+      await ApiService.addToWatchlist(
+        item: widget.item,
+        status: 'watching',
+        rating: 0,
+        favorite: false,
+        notes: '',
+        seasonWatched: _selectedSeason,
+        episodesWatched: episodeNumber,
+      );
+      await _checkWatchlistStatus();
+    } else if (_watchlistItem != null) {
+      final isWatched = _isEpisodeWatched(episodeNumber);
+      final newWatched = isWatched ? episodeNumber - 1 : episodeNumber;
+      await ApiService.updateWatchlist(
+        id: _watchlistItem!.id,
+        status: _watchlistItem!.status,
+        rating: _watchlistItem!.rating,
+        favorite: _watchlistItem!.favorite,
+        notes: _watchlistItem!.notes,
+        seasonWatched: _selectedSeason,
+        episodesWatched: newWatched,
+      );
+      await _checkWatchlistStatus();
+    }
+
+    if (mounted) {
+      setState(() => _isSavingProgress = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final backdropUrl = widget.item.backdropPath.isNotEmpty
-        ? 'https://image.tmdb.org/t/p/w780${widget.item.backdropPath}'
-        : ApiService.getFullImageUrl(widget.item);
-
+    final backdropUrl = ApiService.getFullBackdropUrl(widget.item);
     final posterUrl = ApiService.getFullImageUrl(widget.item);
     final totalSeasons = _detailData?['total_seasons'] ?? widget.item.totalSeasons;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.bgPrimary,
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: [
-          // Banner SliverAppBar
+          // Cinematic Sliver App Bar
           SliverAppBar(
-            expandedHeight: 250,
+            expandedHeight: 260,
             pinned: true,
-            backgroundColor: const Color(0xFF1E293B),
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                widget.item.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  shadows: [Shadow(color: Colors.black87, blurRadius: 10)],
+            backgroundColor: AppColors.bgPrimary,
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0x99000000),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
                 ),
               ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  backdropUrl.isNotEmpty
-                      ? Image.network(backdropUrl, fit: BoxFit.cover)
-                      : Container(color: const Color(0xFF1E293B)),
+                  if (backdropUrl.isNotEmpty)
+                    Image.network(
+                      backdropUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(color: AppColors.bgCard),
+                    )
+                  else
+                    Container(color: AppColors.bgCard),
                   Container(
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.transparent,
-                          const Color(0xFF0F172A).withOpacity(0.9),
-                          const Color(0xFF0F172A),
+                          Color(0x4D000000),
+                          Color(0x99000000),
+                          AppColors.bgPrimary,
                         ],
                       ),
                     ),
@@ -106,60 +178,78 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
             ),
           ),
 
-          // Details Body
+          // Main Detail Body
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Poster & Main Info Row
+                  // Poster + Title Header Row
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: posterUrl.isNotEmpty
-                            ? Image.network(posterUrl, width: 100, height: 150, fit: BoxFit.cover)
-                            : Container(width: 100, height: 150, color: const Color(0xFF1E293B), child: const Icon(Icons.movie, size: 48, color: Colors.white24)),
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          width: 95,
+                          height: 140,
+                          child: posterUrl.isNotEmpty
+                              ? Image.network(posterUrl, fit: BoxFit.cover)
+                              : Container(color: AppColors.bgCard),
+                        ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: widget.item.mediaType == 'tv' ? Colors.purple : Colors.blue,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                widget.item.mediaType == 'tv' ? 'TV Show' : 'Movie',
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            Text(
+                              widget.item.title,
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                height: 1.2,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              'Rilis: ${widget.item.releaseDate}',
-                              style: const TextStyle(color: Colors.white70, fontSize: 13),
-                            ),
-                            const SizedBox(height: 4),
+
+                            // Badges Row
                             Row(
                               children: [
-                                const Icon(Icons.star, color: Colors.amber, size: 18),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${widget.item.voteAverage.toStringAsFixed(1)} / 10.0',
-                                  style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 14),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accentRed,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    widget.item.mediaType == 'tv' ? 'TV SERIES' : 'MOVIE',
+                                    style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
+                                if (widget.item.voteAverage > 0) ...[
+                                  const Icon(Icons.star_rounded, color: AppColors.starGold, size: 16),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '${widget.item.voteAverage.toStringAsFixed(1)} / 10',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
+                                  ),
+                                ],
                               ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Release: ${widget.item.releaseDate}',
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                             ),
                             if (_detailData?['media_status'] != null) ...[
                               const SizedBox(height: 4),
                               Text(
                                 'Status: ${_detailData!['media_status']}',
-                                style: const TextStyle(color: Colors.lightGreenAccent, fontSize: 12),
+                                style: const TextStyle(color: AppColors.successGreen, fontSize: 11, fontWeight: FontWeight.w700),
                               ),
                             ],
                           ],
@@ -169,63 +259,58 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Director & Cast Box
+                  // Metadata Box
                   if (_isLoadingDetail)
-                    const Center(child: CircularProgressIndicator(color: Colors.amber))
+                    const Center(child: CircularProgressIndicator(color: AppColors.accentRed))
                   else if (_detailData != null)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
+                        color: AppColors.bgSurface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withOpacity(0.08)),
+                        border: Border.all(color: AppColors.borderSubtle),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if ((_detailData!['director'] ?? '').isNotEmpty) ...[
-                            Text(
-                              'Sutradara / Pembuat:',
-                              style: TextStyle(color: Colors.amber.shade300, fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                            Text(
-                              _detailData!['director'],
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
-                            ),
-                            const SizedBox(height: 8),
+                            const Text('DIRECTOR / CREATOR', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w800, fontSize: 10)),
+                            const SizedBox(height: 2),
+                            Text(_detailData!['director'], style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 10),
                           ],
                           if ((_detailData!['cast'] ?? '').isNotEmpty) ...[
-                            Text(
-                              'Pemeran Utama:',
-                              style: TextStyle(color: Colors.amber.shade300, fontWeight: FontWeight.bold, fontSize: 12),
-                            ),
-                            Text(
-                              _detailData!['cast'],
-                              style: const TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
+                            const Text('MAIN CAST', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w800, fontSize: 10)),
+                            const SizedBox(height: 2),
+                            Text(_detailData!['cast'], style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
                           ],
                         ],
                       ),
                     ),
+                  const SizedBox(height: 20),
 
-                  const SizedBox(height: 16),
-
-                  // Overview / Synopsis
-                  const Text('Sinopsis', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  // Synopsis
+                  Text(
+                    'SYNOPSIS',
+                    style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    widget.item.overview.isNotEmpty ? widget.item.overview : 'Belum ada ringkasan sinopsis.',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+                    widget.item.overview.isNotEmpty ? widget.item.overview : 'No synopsis available.',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
                   ),
 
-                  // TV Series Season & Episodes Section
+                  // TV Seasons & Episodes
                   if (widget.item.mediaType == 'tv') ...[
-                    const SizedBox(height: 24),
-                    const Text('Daftar Season & Episode', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 28),
+                    Text(
+                      'SEASONS & EPISODES',
+                      style: GoogleFonts.outfit(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800),
+                    ),
                     const SizedBox(height: 10),
 
-                    // Season Chips Selector
+                    // Season Chips
                     if (totalSeasons > 0)
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
@@ -233,105 +318,127 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                           children: List.generate(totalSeasons, (index) {
                             final seasonNum = index + 1;
                             final isSelected = _selectedSeason == seasonNum;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: ChoiceChip(
-                                label: Text('Season $seasonNum', style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontSize: 12)),
-                                selected: isSelected,
-                                selectedColor: Colors.amber,
-                                backgroundColor: const Color(0xFF1E293B),
-                                onSelected: (selected) {
-                                  if (selected) _loadSeasonEpisodes(seasonNum);
-                                },
+                            return GestureDetector(
+                              onTap: () => _loadSeasonEpisodes(seasonNum),
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.accentRed : AppColors.bgSurface,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: isSelected ? AppColors.accentRed : AppColors.borderSubtle),
+                                ),
+                                child: Text(
+                                  'Season $seasonNum',
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             );
                           }),
                         ),
                       ),
-
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
 
                     // Episode List
                     if (_isLoadingEpisodes)
-                      const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: Colors.amber)))
+                      const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: AppColors.accentRed)))
                     else if (_episodes.isEmpty)
-                      const Text('Belum ada data episode untuk season ini.', style: TextStyle(color: Colors.white54, fontSize: 13))
+                      const Text('No episodes listed for this season.', style: TextStyle(color: AppColors.textMuted, fontSize: 12))
                     else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _episodes.length,
-                        itemBuilder: (context, index) {
-                          final eps = _episodes[index];
-                          final stillPath = eps['still_path'] ?? '';
-                          final stillUrl = stillPath.isNotEmpty ? 'https://image.tmdb.org/t/p/w300$stillPath' : '';
+                      ..._episodes.map((eps) {
+                        final epsNum = eps['episode_number'] ?? 1;
+                        final epsName = eps['name'] ?? 'Episode $epsNum';
+                        final stillPath = eps['still_path'] ?? '';
+                        final airDate = eps['air_date'] ?? '';
+                        final overview = eps['overview'] ?? '';
+                        final isWatched = _isEpisodeWatched(epsNum);
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white.withOpacity(0.06)),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Stack(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: stillUrl.isNotEmpty
-                                          ? Image.network(stillUrl, width: 110, height: 65, fit: BoxFit.cover)
-                                          : Container(width: 110, height: 65, color: const Color(0xFF0F172A), child: const Icon(Icons.tv, color: Colors.white24, size: 28)),
-                                    ),
-                                    Positioned(
-                                      bottom: 4,
-                                      left: 4,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(0.8),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          'Eps ${eps['episode_number']}',
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isWatched ? const Color(0x1422C55E) : AppColors.bgSurface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isWatched ? const Color(0x3322C55E) : AppColors.borderSubtle),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Episode Still
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Container(
+                                  width: 90,
+                                  height: 55,
+                                  color: AppColors.bgCard,
+                                  child: stillPath.isNotEmpty
+                                      ? Image.network(
+                                          'https://image.tmdb.org/t/p/w300$stillPath',
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.tv, color: AppColors.textMuted)),
+                                        )
+                                      : const Center(child: Icon(Icons.tv, color: AppColors.textMuted)),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        eps['name'] ?? 'Episode ${eps['episode_number']}',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (eps['air_date'] != null)
-                                        Text('Tayang: ${eps['air_date']}', style: const TextStyle(color: Colors.white54, fontSize: 10)),
+                              ),
+                              const SizedBox(width: 12),
+
+                              // Info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'E$epsNum • $epsName',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
+                                    ),
+                                    if (airDate.isNotEmpty)
+                                      Text(airDate, style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+                                    if (overview.isNotEmpty) ...[
                                       const SizedBox(height: 4),
                                       Text(
-                                        eps['overview'] ?? '',
+                                        overview,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, height: 1.3),
                                       ),
                                     ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+
+                              // Watched Checkmark Toggle
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: EdgeInsets.zero,
+                                icon: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: isWatched ? AppColors.accentRed : AppColors.bgCard,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: isWatched ? AppColors.accentRed : AppColors.borderLight),
+                                  ),
+                                  child: Icon(
+                                    Icons.check_rounded,
+                                    color: isWatched ? Colors.white : AppColors.textMuted,
+                                    size: 18,
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                                onPressed: () => _toggleEpisode(epsNum),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                   ],
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
