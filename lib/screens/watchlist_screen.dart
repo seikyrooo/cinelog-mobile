@@ -813,7 +813,41 @@ class _WatchlistEditSheetState extends State<_WatchlistEditSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Score', style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
-                Text('${_rating.toInt()} / 10', style: const TextStyle(color: AppColors.starGold, fontSize: 13, fontWeight: FontWeight.w800)),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _rating > 0 ? '${_rating.toInt()} / 10' : 'Unrated',
+                      style: TextStyle(
+                        color: _rating > 0 ? AppColors.starGold : AppColors.textMuted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (_rating > 0) ...[
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => setState(() => _rating = 0.0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0x33EF4444),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0x66EF4444)),
+                          ),
+                          child: const Text(
+                            '✕ Hapus Rate',
+                            style: TextStyle(
+                              color: Color(0xFFEF4444),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -825,7 +859,13 @@ class _WatchlistEditSheetState extends State<_WatchlistEditSheet> {
                   final score = (index + 1).toDouble();
                   final isSelected = _rating == score;
                   return GestureDetector(
-                    onTap: () => setState(() => _rating = score),
+                    onTap: () => setState(() {
+                      if (_rating == score) {
+                        _rating = 0.0;
+                      } else {
+                        _rating = score;
+                      }
+                    }),
                     child: Container(
                       margin: const EdgeInsets.only(right: 6),
                       width: 36,
