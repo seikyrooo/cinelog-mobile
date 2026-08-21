@@ -397,8 +397,6 @@ class _WatchlistScreenState extends State<WatchlistScreen>
             ? item.movie.nextEpisodeName
             : 'Episode $nextEpsNum');
 
-    final yearStr = item.movie.releaseDate.isNotEmpty ? item.movie.releaseDate.split('-').first : '';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -487,13 +485,6 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                               ),
                             ),
                           ),
-                          if (yearStr.isNotEmpty) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                              '• $yearStr',
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -550,7 +541,7 @@ class _WatchlistScreenState extends State<WatchlistScreen>
                         if (remainingCount > 0 && !isCompleted) ...[
                           const SizedBox(width: 6),
                           Text(
-                            '+$remainingCount eps left',
+                            '$remainingCount eps left',
                             style: const TextStyle(color: Color(0xFFFF8585), fontSize: 10, fontWeight: FontWeight.w600),
                           ),
                         ],
